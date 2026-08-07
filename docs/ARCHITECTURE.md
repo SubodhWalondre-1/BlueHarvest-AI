@@ -24,3 +24,11 @@
 | - Non-Max Suppression |                    | - Ponds, Tanks & Settings   |
 +-----------------------+                    +-----------------------------+
 ```
+## Image Processing Pipeline Sequence
+
+1. **Ingress**: Capture via WebRTC video stream or multipart file upload.
+2. **Quality Validation**: Image resolution verification, blur analysis, contrast grading.
+3. **Preprocessing**: Normalization, aspect ratio preservation, adaptive histogram equalization.
+4. **Model Inference**: Forward pass through P2PNet feature backbone and coordinate regression heads.
+5. **Post-Processing**: Hungarian point assignment, threshold filtering, count aggregation.
+6. **Telemetry & Ledger**: Save coordinates, total spawn count, timestamp, and metadata to database.
