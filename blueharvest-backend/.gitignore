@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+data/*.db
+data/*.db-*
+data/uploads/
+.coverage
+htmlcov/
+
+.env
+README_MODAL_INTEGRATION.md

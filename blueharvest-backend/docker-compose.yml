@@ -1,0 +1,42 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in the project .env before running Docker Compose}
+      DATABASE_URL: sqlite:////data/blueharvest.db
+      UPLOAD_DIR: /data/uploads
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      MODAL_ENABLED: ${MODAL_ENABLED:-false}
+      MODAL_BASE_URL: ${MODAL_BASE_URL:-https://subodhwalondre87--blueharvest-p2pnet-p2pnetservice-web.modal.run}
+      MODAL_KEY: ${MODAL_KEY:-}
+      MODAL_SECRET: ${MODAL_SECRET:-}
+      MODAL_HEALTH_PATH: ${MODAL_HEALTH_PATH:-/health}
+      MODAL_PREDICT_PATH: ${MODAL_PREDICT_PATH:-/predict}
+      MODAL_TIMEOUT_SECONDS: ${MODAL_TIMEOUT_SECONDS:-90}
+      MODAL_REQUEST_FORMAT: ${MODAL_REQUEST_FORMAT:-multipart}
+      MODAL_IMAGE_FIELD: ${MODAL_IMAGE_FIELD:-image}
+      MODAL_COUNT_FIELD: ${MODAL_COUNT_FIELD:-}
+      MODAL_POINTS_FIELD: ${MODAL_POINTS_FIELD:-}
+      DEMO_MODE_ENABLED: ${DEMO_MODE_ENABLED:-false}
+      DEV_EXPOSE_OTP: "false"
+    volumes:
+      - blueharvest_data:/data
+    restart: unless-stopped
+
+volumes:
+  blueharvest_data:
