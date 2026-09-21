@@ -9,3 +9,6 @@
 ### 2. CUDA Out of Memory
 - **Symptom**: `RuntimeError: CUDA out of memory` during large image batch inference.
 - **Resolution**: Reduce input batch size or configure `FALLBACK_TO_CPU=true` in `.env`.
+### 3. Database Migration Lock
+- **Symptom**: Alembic hangs on `alembic upgrade head`.
+- **Resolution**: Check active database transactions: `SELECT * FROM pg_stat_activity;`
