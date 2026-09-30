@@ -19,3 +19,7 @@ Fish spawn mortality rates vary significantly depending on transportation durati
 - **Mortality Rate**: $70\%$
 - **Net Survival**: $\text{Total} \times 0.30$
 - **Loss**: $\text{Total} \times 0.70$
+## UI Representation
+- **Loss Indicator**: Displayed in prominent bold red font with minus prefix (`-X`).
+- **Net Surviving Spawn**: Highlighted with status accent colors (Emerald green for 98%, Royal blue for 90%, Amber for 30%).
+- **Visual Progress Bar**: Proportional progress track indicating survival fraction.
