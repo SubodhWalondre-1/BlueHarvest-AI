@@ -14,3 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - JWT and Google OAuth2 authentication endpoints.
 - Batch session persistence, automated telemetry, and metrics aggregation.
 - Comprehensive automated pytest test suite.
+
+## [0.9.0] - 2026-10-18
+### Added
+- React 19 + Vite frontend application with light/dark theme manager.
+- WebRTC camera capture stream and drag-and-drop file upload.
+- Batch history feed with chronological groupings.
