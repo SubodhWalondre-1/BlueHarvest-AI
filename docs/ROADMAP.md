@@ -26,3 +26,8 @@ BlueHarvest AI is an intelligent aquaculture computer vision system designed to 
 - [x] High-precision spawn pricing engine (₹0.025/spawn + flat ₹50 packing fee)
 - [x] Real-time aquaculture mortality & survival calculations (1-4h 2%, 12-24h 10%, Pond 70%)
 - [x] Batch detail modal with 3-column CSS Grid alignment and CSV export
+## Phase 4: Production Polish & Operations (Current)
+- [x] Streamlined modal drawer actions and real mortality scenario calculations
+- [x] Balanced 3-column CSS Grid alignment across scenario metrics
+- [x] Full deployment verification on Render (FastAPI) and Netlify (Vite SPA)
+- [ ] Multi-pond batch aggregation and automated invoice PDF generation
