@@ -12,3 +12,7 @@
 - `GET /api/v1/count-sessions/{session_id}`: Fetch detailed batch telemetry and coordinates.
 - `DELETE /api/v1/count-sessions/{session_id}`: Soft delete or purge session record.
 - `GET /api/v1/dashboard/summary`: Aggregate analytics across interval windows.
+
+## Filter Parameters
+- `interval`: Query filter supporting `today`, `this_week`, `this_month`, and `all_time`.
+- `pond_id`: Optional string filter for specific nursery or tank batches.
