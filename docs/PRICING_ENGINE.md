@@ -15,3 +15,7 @@ $$\text{Total Price (₹)} = (\text{Spawn Count} \times ₹0.025) + ₹50.00$$
 | 2,433 spawns | ₹60.83 | ₹50.00 | ₹110.83 |
 | 5,000 spawns | ₹125.00 | ₹50.00 | ₹175.00 |
 | 10,000 spawns | ₹250.00 | ₹50.00 | ₹300.00 |
+
+## Layout & Baseline Rules
+- Total Spawn and Price metric tiles must maintain equal padding and synchronized font size (`24px`, weight `900`).
+- Price values must use the Indian Rupee symbol (`₹`) formatted with two decimal places.
