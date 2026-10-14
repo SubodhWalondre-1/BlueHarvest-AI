@@ -23,3 +23,15 @@ Fish spawn mortality rates vary significantly depending on transportation durati
 - **Loss Indicator**: Displayed in prominent bold red font with minus prefix (`-X`).
 - **Net Surviving Spawn**: Highlighted with status accent colors (Emerald green for 98%, Royal blue for 90%, Amber for 30%).
 - **Visual Progress Bar**: Proportional progress track indicating survival fraction.
+
+## Formula Implementations
+```typescript
+const loss1to4 = Math.round(total * 0.02);
+const surviving1to4 = Math.max(0, total - loss1to4);
+
+const loss12to24 = Math.round(total * 0.10);
+const surviving12to24 = Math.max(0, total - loss12to24);
+
+const lossPond = Math.round(total * 0.70);
+const survivingPond = Math.max(0, total - lossPond);
+```
