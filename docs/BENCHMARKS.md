@@ -15,3 +15,10 @@
 | 100 - 500 | 3.2 spawns | 0.85% | 99.1% |
 | 500 - 2,500 | 18.6 spawns | 1.12% | 98.9% |
 | 2,500 - 10,000 | 74.2 spawns | 1.48% | 98.5% |
+
+## Live Camera Capture Benchmarks
+
+| Camera Capture Mode | Resolution | Target FPS | Measured Processing Latency |
+|---|---|---|---|
+| WebRTC 720p Live | 1280x720 | 30 FPS | 22 ms |
+| WebRTC 1080p Live | 1920x1080 | 30 FPS | 36 ms |
