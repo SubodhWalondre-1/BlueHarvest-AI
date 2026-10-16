@@ -12,3 +12,9 @@
 ### 3. Database Migration Lock
 - **Symptom**: Alembic hangs on `alembic upgrade head`.
 - **Resolution**: Check active database transactions: `SELECT * FROM pg_stat_activity;`
+
+## Browser Compatibility Matrix
+- Google Chrome: Full Support (WebRTC, Canvas, CSS Grid)
+- Microsoft Edge: Full Support
+- Mozilla Firefox: Full Support
+- Apple Safari: Full Support (iOS 15.4+, macOS 12+)
