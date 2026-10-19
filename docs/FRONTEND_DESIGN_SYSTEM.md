@@ -11,3 +11,15 @@
 - **DualFishLoader**: Custom SVG animation representing circular fish swimming motion.
 - **Status Badges**: Pill badges with high-contrast text and semi-transparent tinted backgrounds.
 - **Metric Cards**: Paired metric tiles with synchronized font sizing and baseline alignment.
+
+## Scenario Card Grid Alignment
+Scenario metrics must utilize a strict 3-column CSS Grid to lock separator arrows to the exact vertical centerline:
+
+```css
+.scenario-numbers-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+```
