@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap');
+
+:root {
+  --primary-blue: #2F6BFF;
+  --primary-blue-hover: #225DEE;
+  --primary-blue-glow: rgba(47, 107, 255, 0.38);
+  --navy-dark: #0B256B;
+  --navy-dark-hover: #071A4D;
+  --navy-dark-glow: rgba(11, 37, 107, 0.38);
+  --app-bg: #EEF4FD;
+  --app-bg-gradient: linear-gradient(180deg, #F3F7FE 0%, #E3EEFD 100%);
+  --text-dark: #0B162C;
+  --text-muted: #5B6B82;
+  --text-dim: #8E9DB8;
+  --input-bg: #EEF4FD;
+  --input-border: #D1E1F7;
+  --input-focus-border: #2F6BFF;
+  --input-shadow-inset: inset 2.5px 2.5px 5px rgba(180, 201, 230, 0.45), inset -2.5px -2.5px 5px rgba(255, 255, 255, 0.95);
+  --white: #FFFFFF;
+  --error: #DC2626;
+  --success: #10B981;
+  
+  --font-main: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  --radius-pill: 20px;
+  --radius-input: 18px;
+  --radius-card: 28px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  font-family: var(--font-main);
+  background-color: #F4F8FF;
+  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+#root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+#root::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+a {
+  color: var(--primary-blue);
+  text-decoration: none;
+  font-weight: 700;
+  transition: opacity 0.15s ease;
+}
+
+a:hover {
+  opacity: 0.85;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes waveFloat {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-4px) scaleY(1.02); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 10px 24px var(--primary-blue-glow); }
+  50% { box-shadow: 0 14px 30px rgba(47, 107, 255, 0.55); }
+}
+
+@keyframes swimMotion {
+  0% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(3px) rotate(1.5deg); }
+  50% { transform: translateX(0) rotate(0deg); }
+  75% { transform: translateX(-3px) rotate(-1.5deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+
+.animate-fade {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.fish-swim {
+  animation: swimMotion 4s ease-in-out infinite;
+}
