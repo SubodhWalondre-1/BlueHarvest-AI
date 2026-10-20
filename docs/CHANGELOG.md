@@ -20,3 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - React 19 + Vite frontend application with light/dark theme manager.
 - WebRTC camera capture stream and drag-and-drop file upload.
 - Batch history feed with chronological groupings.
+
+## [1.0.0] - 2026-10-21
+### Added
+- Real-time mortality analysis engine (1-4h 2%, 12-24h 10%, Pond Stocking 70%).
+- Spawn pricing model (₹0.025 per spawn + ₹50 flat packing overhead).
+- Time interval filtering for analytics (Today, This Week, This Month, All Time).
+- High-fidelity 3-column CSS grid alignment across scenario cards.
