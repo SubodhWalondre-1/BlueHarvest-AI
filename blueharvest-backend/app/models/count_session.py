@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.core.time import utcnow_naive
@@ -15,6 +15,7 @@ class CountSession(Base):
     status: Mapped[str] = mapped_column(String(32), default="completed", nullable=False)
     is_saved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    inference_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
     source: Mapped[str] = mapped_column(String(32), default="Uploaded", nullable=False)
     container: Mapped[str | None] = mapped_column(String(32))
     dimensions: Mapped[str | None] = mapped_column(String(80))
