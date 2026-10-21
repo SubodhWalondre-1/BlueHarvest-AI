@@ -1384,7 +1384,7 @@ export default function HomePage({
 
             {/* Time Filter Pills: Today, This Week, This Month, All Time */}
             <div className="insights-filter-pills-row">
-              {['24 Hours', '7 Days', '30 Days', 'All Time'].map((period) => (
+              {['Today', 'This Week', 'This Month', 'All Time'].map((period) => (
                 <button
                   key={period}
                   type="button"
