@@ -2775,7 +2775,230 @@ body::-webkit-scrollbar,
   background: #1E293B;
 }
 
+/* ==========================================================================
+   Batch Detail Modal: Mortality & Survival Analysis
+   ========================================================================== */
+.batch-analysis-container {
+  margin: 12px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
+.batch-analysis-banner-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  background: #EFF6FF;
+  border: 1.5px solid #BFDBFE;
+  border-radius: 12px;
+  color: #1D4ED8;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.batch-analysis-banner-btn:hover {
+  background: #DBEAFE;
+  border-color: #93C5FD;
+}
+
+.batch-analysis-banner-btn.active {
+  background: #1D4ED8;
+  color: #FFFFFF;
+  border-color: #1D4ED8;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2);
+}
+
+.analysis-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysis-btn-arrow {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.analysis-btn-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.batch-analysis-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeInPop 0.2s ease-out;
+}
+
+.analysis-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 7px;
+}
+
+.analysis-card-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.analysis-card-sub {
+  font-size: 11px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.analysis-scenarios-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.analysis-scenario-item {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.scenario-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scenario-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1E293B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.scenario-rate-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2.5px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.scenario-rate-badge.rate-2 {
+  background: #ECFDF5;
+  color: #047857;
+}
+
+.scenario-rate-badge.rate-10 {
+  background: #EFF6FF;
+  color: #1D4ED8;
+}
+
+.scenario-rate-badge.rate-70 {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
+.scenario-numbers-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0 2px;
+}
+
+.scenario-stat-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.scenario-stat-col.stat-left {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.scenario-arrow-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94A3B8;
+  font-weight: 700;
+  font-size: 14px;
+  user-select: none;
+  min-width: 20px;
+}
+
+.scenario-stat-col.stat-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.scenario-stat-lbl {
+  font-size: 10px;
+  color: #64748B;
+  font-weight: 600;
+  margin-bottom: 2px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.scenario-loss-val {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.scenario-surviving-val {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.scenario-progress-track {
+  width: 100%;
+  height: 5px;
+  background: #F1F5F9;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.scenario-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.scenario-progress-bar.bar-green {
+  background: #10B981;
+}
+
+.scenario-progress-bar.bar-blue {
+  background: #3B82F6;
+}
+
+.scenario-progress-bar.bar-amber {
+  background: #F59E0B;
+}
 
 .text-red {
   color: #DC2626;
@@ -5326,225 +5549,3 @@ html, body, .app-viewport-wrapper, .app-mobile-container,
   color: #94A3B8 !important;
 }
 
-
-/* Modal density and total spawn metric baseline harmonization */
-
-
-/* ==========================================================================
-   Batch Detail Modal: Mortality & Survival Analysis
-   ========================================================================== */
-.batch-analysis-container {
-  margin: 12px 0 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.batch-analysis-banner-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px;
-  background: #EFF6FF;
-  border: 1.5px solid #BFDBFE;
-  border-radius: 12px;
-  color: #1D4ED8;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.batch-analysis-banner-btn:hover {
-  background: #DBEAFE;
-  border-color: #93C5FD;
-}
-
-.batch-analysis-banner-btn.active {
-  background: #1D4ED8;
-  color: #FFFFFF;
-  border-color: #1D4ED8;
-  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2);
-}
-
-.analysis-btn-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.analysis-btn-arrow {
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-
-.analysis-btn-arrow.rotated {
-  transform: rotate(180deg);
-}
-
-.batch-analysis-card {
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 14px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  animation: fadeInPop 0.2s ease-out;
-}
-
-.analysis-card-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-bottom: 1px solid #E2E8F0;
-  padding-bottom: 7px;
-}
-
-.analysis-card-title {
-  font-size: 13px;
-  font-weight: 800;
-  color: #0F172A;
-}
-
-.analysis-card-sub {
-  font-size: 11px;
-  color: #64748B;
-  font-weight: 500;
-}
-
-.analysis-scenarios-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.analysis-scenario-item {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-}
-
-.scenario-top-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.scenario-title {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #1E293B;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-}
-
-.scenario-rate-badge {
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 2.5px 8px;
-  border-radius: 9999px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1.2;
-}
-
-.scenario-rate-badge.rate-2 {
-  background: #ECFDF5;
-  color: #047857;
-}
-
-.scenario-rate-badge.rate-10 {
-  background: #EFF6FF;
-  color: #1D4ED8;
-}
-
-.scenario-rate-badge.rate-70 {
-  background: #FEF3C7;
-  color: #B45309;
-}
-
-.scenario-numbers-row { display: flex; align-items: center; justify-content: space-between; padding: 2px 0; }
-
-.scenario-stat-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.scenario-stat-col.stat-left {
-  align-items: flex-start;
-  text-align: left;
-}
-
-.scenario-arrow-col {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #94A3B8;
-  font-weight: 700;
-  font-size: 14px;
-  user-select: none;
-  min-width: 20px;
-}
-
-.scenario-stat-col.stat-right {
-  align-items: flex-end;
-  text-align: right;
-}
-
-.scenario-stat-lbl {
-  font-size: 10px;
-  color: #64748B;
-  font-weight: 600;
-  margin-bottom: 2px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.scenario-loss-val {
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.scenario-surviving-val {
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1.2;
-}
-
-.scenario-progress-track {
-  width: 100%;
-  height: 5px;
-  background: #F1F5F9;
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-top: 2px;
-}
-
-.scenario-progress-bar {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width 0.3s ease;
-}
-
-.scenario-progress-bar.bar-green {
-  background: #10B981;
-}
-
-.scenario-progress-bar.bar-blue {
-  background: #3B82F6;
-}
-
-.scenario-progress-bar.bar-amber {
-  background: #F59E0B;
-}

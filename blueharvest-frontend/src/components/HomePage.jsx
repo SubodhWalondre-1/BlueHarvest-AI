@@ -111,9 +111,6 @@ const formatPriceINR = (count) => {
   return '₹' + price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-
-
-
 // Calculate spawn mortality and net survival estimates based on total spawn count
 const calculateMortalityAnalysis = (count) => {
   const total = Math.max(0, Number(count) || 0);
@@ -1273,7 +1270,7 @@ export default function HomePage({
                           role="button"
                           tabIndex={0}
                         >
-                          {/* Left Square Thumbnail: preserved for uploaded files and live captures */}
+                          {/* Left Square Thumbnail */}
                           <div className="history-thumb-box">
                             <img 
                               src={item.image || heroImage} 
@@ -1932,8 +1929,7 @@ export default function HomePage({
               </div>
             </div>
 
-            
-              {/* Clean metadata grid focused on operational context */}
+            <div className="batch-modal-meta-grid">
               <div className="modal-meta-row">
                 <span className="meta-lbl">Price Breakdown</span>
                 <span className="meta-val">₹0.025/spawn + ₹50 packing</span>
@@ -2001,27 +1997,6 @@ export default function HomePage({
                         </div>
                       </div>
 
-                      {/* Scenario 3: After putting spawn in pond / fish */}
-                      <div className="analysis-scenario-item pond-stocking">
-                        <div className="scenario-top-row">
-                          <span className="scenario-title">Pond Stocking (After Putting Spawn)</span>
-                          <span className="scenario-rate-badge rate-70">70% Mortality</span>
-                        </div>
-                        <div className="scenario-numbers-row">
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Estimated Loss</span>
-                            <span className="scenario-loss-val text-red">-{analysis.pond70.loss.toLocaleString()}</span>
-                          </div>
-                          <div className="scenario-arrow-col">→</div>
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Surviving Fish Count</span>
-                            <span className="scenario-surviving-val text-amber">{analysis.pond70.surviving.toLocaleString()}</span>
-                          </div>
-                        </div>
-                        <div className="scenario-progress-track">
-                          <div className="scenario-progress-bar bar-amber" style={{ width: '30%' }} />
-                        </div>
-                      </div>
                       {/* Scenario 2: 12 to 24 hr transportation */}
                       <div className="analysis-scenario-item transit-long">
                         <div className="scenario-top-row">
@@ -2071,106 +2046,8 @@ export default function HomePage({
               })()}
             </div>
 
-                        {/* Analysis Section Trigger & Real Mortality Calculations */}
-            <div className="batch-analysis-container">
-              <button 
-                type="button" 
-                className={`batch-analysis-banner-btn ${showBatchAnalysis ? 'active' : ''}`}
-                onClick={() => setShowBatchAnalysis(!showBatchAnalysis)}
-                aria-expanded={showBatchAnalysis}
-              >
-                <div className="analysis-btn-content">
-                  <BarChart3 size={17} className="analysis-btn-icon" />
-                  <span className="analysis-btn-text">
-                    {showBatchAnalysis ? 'Hide Mortality & Survival Analysis' : 'Mortality & Survival Analysis'}
-                  </span>
-                </div>
-                <ChevronDown size={17} className={`analysis-btn-arrow ${showBatchAnalysis ? 'rotated' : ''}`} />
-              </button>
-
-              {showBatchAnalysis && (() => {
-                const analysis = calculateMortalityAnalysis(selectedBatchModal.count);
-                return (
-                  <div className="batch-analysis-card">
-                    <div className="analysis-card-header">
-                      <span className="analysis-card-title">Real Mortality & Survival Estimates</span>
-                      <span className="analysis-card-sub">Calculated from total spawn count: {Number(selectedBatchModal.count).toLocaleString()}</span>
-                    </div>
-
-                    <div className="analysis-scenarios-list">
-                      {/* Scenario 1: 1 to 4 hr transportation */}
-                      <div className="analysis-scenario-item transit-short">
-                        <div className="scenario-top-row">
-                          <span className="scenario-title">1 to 4 hr Transportation</span>
-                          <span className="scenario-rate-badge rate-2">2% Mortality</span>
-                        </div>
-                        <div className="scenario-numbers-row">
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Estimated Loss</span>
-                            <span className="scenario-loss-val text-red">-{analysis.t1to4.loss.toLocaleString()}</span>
-                          </div>
-                          <div className="scenario-arrow-col">→</div>
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Net Surviving Spawn</span>
-                            <span className="scenario-surviving-val text-green">{analysis.t1to4.surviving.toLocaleString()}</span>
-                          </div>
-                        </div>
-                        <div className="scenario-progress-track">
-                          <div className="scenario-progress-bar bar-green" style={{ width: '98%' }} />
-                        </div>
-                      </div>
-
-                      {/* Scenario 3: After putting spawn in pond / fish */}
-                      <div className="analysis-scenario-item pond-stocking">
-                        <div className="scenario-top-row">
-                          <span className="scenario-title">Pond Stocking (After Putting Spawn)</span>
-                          <span className="scenario-rate-badge rate-70">70% Mortality</span>
-                        </div>
-                        <div className="scenario-numbers-row">
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Estimated Loss</span>
-                            <span className="scenario-loss-val text-red">-{analysis.pond70.loss.toLocaleString()}</span>
-                          </div>
-                          <div className="scenario-arrow-col">→</div>
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Surviving Fish Count</span>
-                            <span className="scenario-surviving-val text-amber">{analysis.pond70.surviving.toLocaleString()}</span>
-                          </div>
-                        </div>
-                        <div className="scenario-progress-track">
-                          <div className="scenario-progress-bar bar-amber" style={{ width: '30%' }} />
-                        </div>
-                      </div>
-                      {/* Scenario 2: 12 to 24 hr transportation */}
-                      <div className="analysis-scenario-item transit-long">
-                        <div className="scenario-top-row">
-                          <span className="scenario-title">12 to 24 hr Transportation</span>
-                          <span className="scenario-rate-badge rate-10">10% Mortality</span>
-                        </div>
-                        <div className="scenario-numbers-row">
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Estimated Loss</span>
-                            <span className="scenario-loss-val text-red">-{analysis.t12to24.loss.toLocaleString()}</span>
-                          </div>
-                          <div className="scenario-arrow-col">→</div>
-                          <div className="scenario-stat-col">
-                            <span className="scenario-stat-lbl">Net Surviving Spawn</span>
-                            <span className="scenario-surviving-val text-blue">{analysis.t12to24.surviving.toLocaleString()}</span>
-                          </div>
-                        </div>
-                        <div className="scenario-progress-track">
-                          <div className="scenario-progress-bar bar-blue" style={{ width: '90%' }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
             <div className="batch-modal-actions-row">
-              {/* Streamlined action footer: CSV export and close */}
-              <button type="button" className="modal-analysis-btn"><BarChart3 size={16} /><span>Analysis</span></button> <button 
+              <button 
                 type="button" 
                 className="modal-csv-btn"
                 onClick={(e) => handleExportCSV(selectedBatchModal, e)}
