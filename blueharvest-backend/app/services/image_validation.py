@@ -10,8 +10,10 @@ MAX_IMAGE_PIXELS = 60_000_000
 async def read_and_validate_image(upload: UploadFile) -> tuple[bytes, dict]:
     filename = (upload.filename or "upload").replace("\\", "/").split("/")[-1][:180]
     content_type = (upload.content_type or "").lower()
-    data = await upload.read(settings.max_upload_mb * 1024 * 1024 + 1)
-    await upload.close()
+    try:
+        data = await upload.read(settings.max_upload_mb * 1024 * 1024 + 1)
+    finally:
+        await upload.close()
     if not data:
         raise HTTPException(status_code=400, detail={"code": "empty_upload", "message": "The uploaded image is empty."})
     if len(data) > settings.max_upload_mb * 1024 * 1024:

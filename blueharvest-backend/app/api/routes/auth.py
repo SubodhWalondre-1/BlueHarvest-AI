@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
+from math import ceil
 from uuid import uuid4
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_cookie_csrf
 from app.core.config import settings
 from app.core.security import digest_otp, digest_token, generate_opaque_token, generate_otp, hash_password, verify_password
 from app.db.session import get_db
@@ -14,6 +15,7 @@ from app.services.auth_service import authenticate_user, create_user, issue_sess
 from app.services.email_service import DeliveryNotConfigured, send_email_otp
 from app.services.sms_service import send_sms_otp
 from app.services.google_auth_service import GoogleCredentialError, verify_google_credential
+from app.services.rate_limit_service import clear_account_limit, enforce_rate_limit
 from app.core.time import utcnow_naive
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
@@ -29,8 +31,14 @@ def _find_user_by_destination(db: Session, destination: str) -> tuple[User | Non
     return db.scalar(select(User).where(User.phone == normalized)), normalized, "sms"
 
 
+def _lock_recovery_user(db: Session, user_id: str) -> None:
+    # Serialize recovery changes per account on PostgreSQL and SQLite.
+    db.execute(update(User).where(User.id == user_id).values(updated_at=User.updated_at))
+
+
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db)):
+def signup(body: SignupRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    enforce_rate_limit(db, request, "signup", ip_limit=settings.signup_ip_limit, window_seconds=settings.signup_window_seconds)
     user = create_user(
         db, full_name=body.full_name, username=body.username, email=str(body.email), phone=body.phone,
         pond_location=body.pond_location, password=body.password,
@@ -39,8 +47,16 @@ def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db
 
 
 @router.post("/login")
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    identity = body.username.strip()
+    user_id = db.scalar(select(User.id).where(or_(User.username == identity, User.email == identity.lower())))
+    account = f"user:{user_id}" if user_id else f"identity:{identity.casefold()}"
+    enforce_rate_limit(
+        db, request, "login", ip_limit=settings.login_ip_limit, window_seconds=settings.login_window_seconds,
+        account=account, account_limit=settings.login_account_limit,
+    )
     user = authenticate_user(db, body.username, body.password)
+    clear_account_limit(db, "login", account)
     return issue_session(db, user, response)
 
 
@@ -94,7 +110,7 @@ def auth_me(user: User = Depends(get_current_user)):
     return {"user": public_user(user)}
 
 
-@router.post("/refresh")
+@router.post("/refresh", dependencies=[Depends(require_cookie_csrf)])
 def refresh_session(request: Request, response: Response, db: Session = Depends(get_db)):
     raw = request.cookies.get(settings.refresh_cookie_name)
     if not raw:
@@ -109,7 +125,7 @@ def refresh_session(request: Request, response: Response, db: Session = Depends(
     return issue_session(db, current.user, response)
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(require_cookie_csrf)])
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     raw = request.cookies.get(settings.refresh_cookie_name)
     if raw:
@@ -122,7 +138,8 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 
 @router.post("/password-reset/request")
-async def password_reset_request(body: PasswordResetRequest, db: Session = Depends(get_db)):
+async def password_reset_request(body: PasswordResetRequest, request: Request, db: Session = Depends(get_db)):
+    enforce_rate_limit(db, request, "otp-request", ip_limit=settings.otp_request_ip_limit, window_seconds=settings.otp_window_seconds)
     user, destination, channel = _find_user_by_destination(db, body.destination)
     generic_response = {"ok": True, "message": "If an account matches that contact detail, a recovery code has been sent."}
     local_otp_exposure = settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp
@@ -139,12 +156,14 @@ async def password_reset_request(body: PasswordResetRequest, db: Session = Depen
     if user is None:
         return generic_response
 
-    recent_count = db.query(PasswordResetChallenge).filter(
-        PasswordResetChallenge.user_id == user.id,
-        PasswordResetChallenge.created_at >= utcnow_naive() - timedelta(minutes=15),
-    ).count()
+    now = utcnow_naive()
+    recent_count, oldest_request = db.execute(
+        select(func.count(PasswordResetChallenge.id), func.min(PasswordResetChallenge.created_at))
+        .where(PasswordResetChallenge.user_id == user.id, PasswordResetChallenge.created_at >= now - timedelta(minutes=15))
+    ).one()
     if recent_count >= 5:
-        raise HTTPException(status_code=429, detail={"code": "recovery_rate_limited", "message": "Too many recovery requests. Try again later."})
+        retry_after = max(1, ceil((oldest_request + timedelta(minutes=15) - now).total_seconds()))
+        raise HTTPException(status_code=429, detail={"code": "recovery_rate_limited", "message": "Too many recovery requests. Try again later.", "retry_after": retry_after}, headers={"Retry-After": str(retry_after)})
 
     code = generate_otp()
     challenge = PasswordResetChallenge(
@@ -152,7 +171,6 @@ async def password_reset_request(body: PasswordResetRequest, db: Session = Depen
         code_hash=digest_otp(destination, code),
         expires_at=utcnow_naive() + timedelta(minutes=settings.otp_ttl_minutes),
     )
-    db.add(challenge)
     development_code = None
     try:
         if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
@@ -167,6 +185,16 @@ async def password_reset_request(body: PasswordResetRequest, db: Session = Depen
     except Exception:
         db.rollback()
         raise HTTPException(status_code=502, detail={"code": "recovery_delivery_failed", "message": "Recovery code delivery failed. Check the provider configuration and try again."})
+    _lock_recovery_user(db, user.id)
+    now = utcnow_naive()
+    db.execute(
+        update(PasswordResetChallenge)
+        .where(PasswordResetChallenge.user_id == user.id, PasswordResetChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+    )
+    challenge.created_at = now
+    challenge.expires_at = now + timedelta(minutes=settings.otp_ttl_minutes)
+    db.add(challenge)
     db.commit()
     result = dict(generic_response)
     if development_code is not None:
@@ -177,19 +205,28 @@ async def password_reset_request(body: PasswordResetRequest, db: Session = Depen
 
 
 @router.post("/password-reset/verify")
-def password_reset_verify(body: PasswordResetVerify, db: Session = Depends(get_db)):
-    _, destination, _ = _find_user_by_destination(db, body.destination)
-    challenge = db.scalar(
-        select(PasswordResetChallenge)
-        .where(
-            PasswordResetChallenge.destination == destination,
-            PasswordResetChallenge.consumed_at.is_(None),
-            PasswordResetChallenge.verified_at.is_(None),
-        )
-        .order_by(PasswordResetChallenge.created_at.desc())
+def password_reset_verify(body: PasswordResetVerify, request: Request, db: Session = Depends(get_db)):
+    user, destination, _ = _find_user_by_destination(db, body.destination)
+    enforce_rate_limit(
+        db, request, "otp-verify", ip_limit=settings.otp_ip_limit, window_seconds=settings.otp_window_seconds,
+        account=f"user:{user.id}" if user else f"identity:{destination}", account_limit=settings.otp_account_limit,
     )
+    challenge = None
+    if user:
+        _lock_recovery_user(db, user.id)
+        challenge = db.scalar(
+            select(PasswordResetChallenge)
+            .where(PasswordResetChallenge.user_id == user.id, PasswordResetChallenge.consumed_at.is_(None))
+            .order_by(PasswordResetChallenge.created_at.desc())
+            .limit(1)
+            .execution_options(populate_existing=True)
+        )
     now = utcnow_naive()
-    if not challenge or challenge.expires_at <= now or challenge.attempt_count >= settings.otp_max_attempts:
+    if (
+        not challenge or challenge.destination != destination or challenge.verified_at is not None
+        or challenge.expires_at <= now or challenge.attempt_count >= settings.otp_max_attempts
+    ):
+        db.rollback()
         raise HTTPException(status_code=400, detail={"code": "recovery_code_invalid", "message": "The recovery code is invalid or expired."})
     challenge.attempt_count += 1
     if not secrets_compare(digest_otp(destination, body.code), challenge.code_hash):
@@ -208,27 +245,40 @@ def secrets_compare(left: str, right: str) -> bool:
 
 
 @router.post("/password-reset/confirm")
-def password_reset_confirm(body: PasswordResetConfirm, db: Session = Depends(get_db)):
-    _, destination, _ = _find_user_by_destination(db, body.destination)
-    challenge = db.scalar(
-        select(PasswordResetChallenge)
-        .where(
-            PasswordResetChallenge.destination == destination,
-            PasswordResetChallenge.consumed_at.is_(None),
-            PasswordResetChallenge.reset_token_hash == digest_token(body.reset_token),
-        )
-        .order_by(PasswordResetChallenge.created_at.desc())
+def password_reset_confirm(body: PasswordResetConfirm, request: Request, db: Session = Depends(get_db)):
+    user, destination, _ = _find_user_by_destination(db, body.destination)
+    enforce_rate_limit(
+        db, request, "otp-confirm", ip_limit=settings.otp_ip_limit, window_seconds=settings.otp_window_seconds,
+        account=f"user:{user.id}" if user else f"identity:{destination}", account_limit=settings.otp_account_limit,
     )
+    challenge = None
+    if user:
+        _lock_recovery_user(db, user.id)
+        challenge = db.scalar(
+            select(PasswordResetChallenge)
+            .where(PasswordResetChallenge.user_id == user.id, PasswordResetChallenge.consumed_at.is_(None))
+            .order_by(PasswordResetChallenge.created_at.desc())
+            .limit(1)
+            .execution_options(populate_existing=True)
+        )
     now = utcnow_naive()
-    if not challenge or not challenge.verified_at or challenge.expires_at <= now:
+    if (
+        not challenge or challenge.destination != destination or not challenge.verified_at
+        or challenge.expires_at <= now or not challenge.reset_token_hash
+        or not secrets_compare(challenge.reset_token_hash, digest_token(body.reset_token))
+    ):
+        db.rollback()
         raise HTTPException(status_code=400, detail={"code": "reset_token_invalid", "message": "The password reset verification has expired. Request a new code."})
-    user = db.get(User, challenge.user_id)
-    if not user:
-        raise HTTPException(status_code=400, detail={"code": "reset_token_invalid", "message": "The reset request is no longer valid."})
     user.password_hash = hash_password(body.new_password)
-    challenge.consumed_at = now
-    for session in user.sessions:
-        if session.revoked_at is None:
-            session.revoked_at = now
+    db.execute(
+        update(PasswordResetChallenge)
+        .where(PasswordResetChallenge.user_id == user.id, PasswordResetChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+    )
+    db.execute(
+        update(AuthSession)
+        .where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
     db.commit()
     return {"ok": True, "message": "Password updated. Sign in with your new password."}

@@ -1,13 +1,22 @@
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from app.core.security import decode_access_token
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import AuthSession, User
 from app.core.time import utcnow_naive
 
 _bearer = HTTPBearer(auto_error=False)
+CSRF_HEADER = "X-CSRF-Protection"
+
+
+def require_cookie_csrf(request: Request) -> None:
+    origins = request.headers.getlist("origin")
+    # A custom header requires browser preflight for cross-origin requests.
+    if len(origins) != 1 or origins[0] not in settings.allowed_origins or request.headers.getlist(CSRF_HEADER) != ["1"]:
+        raise HTTPException(status_code=403, detail={"code": "csrf_failed", "message": "A trusted Origin and CSRF protection header are required."})
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer), db: Session = Depends(get_db)) -> User:

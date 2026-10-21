@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.config import settings
@@ -39,6 +39,7 @@ def dashboard_summary(
         raise HTTPException(status_code=403, detail={"code": "demo_mode_disabled", "message": "Demo data mode is disabled."})
     start = _range_start(range)
     stmt = select(CountSession).where(CountSession.user_id == user.id, CountSession.is_saved.is_(True))
+    stmt = stmt.where(or_(CountSession.inference_verified.is_(True), CountSession.is_demo.is_(True)))
     if start:
         stmt = stmt.where(CountSession.created_at >= start)
     if not include_demo:

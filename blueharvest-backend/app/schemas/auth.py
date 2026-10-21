@@ -1,5 +1,5 @@
-import re
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from app.schemas.user import normalize_phone
 
 
 class SignupRequest(BaseModel):
@@ -10,20 +10,12 @@ class SignupRequest(BaseModel):
     pond_location: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=8, max_length=128)
 
-    @field_validator("phone")
-    @classmethod
-    def normalize_phone(cls, value: str | None) -> str | None:
-        if value is None or not value.strip():
-            return None
-        normalized = re.sub(r"[\s().-]", "", value.strip())
-        if not re.fullmatch(r"\+?[1-9]\d{7,14}", normalized):
-            raise ValueError("Phone must use an international format, for example +919876543210")
-        return normalized
+    _phone = field_validator("phone", mode="before")(normalize_phone)
 
-    @field_validator("username", "email", "pond_location", "full_name")
+    @field_validator("username", "email", "pond_location", "full_name", mode="before")
     @classmethod
-    def strip_text(cls, value: str) -> str:
-        return value.strip()
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class LoginRequest(BaseModel):

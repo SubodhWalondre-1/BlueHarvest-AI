@@ -1,5 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +24,23 @@ class Settings(BaseSettings):
     dev_expose_otp: bool = False
     otp_ttl_minutes: int = 10
     otp_max_attempts: int = 5
+    login_window_seconds: int = Field(default=300, ge=1)
+    login_account_limit: int = Field(default=5, ge=1)
+    login_ip_limit: int = Field(default=30, ge=1)
+    signup_window_seconds: int = Field(default=3600, ge=1)
+    signup_ip_limit: int = Field(default=10, ge=1)
+    otp_window_seconds: int = Field(default=60, ge=1)
+    otp_account_limit: int = Field(default=10, ge=1)
+    otp_ip_limit: int = Field(default=30, ge=1)
+    otp_request_ip_limit: int = Field(default=10, ge=1)
+    inference_window_seconds: int = Field(default=60, ge=1)
+    inference_account_limit: int = Field(default=10, ge=1)
+    inference_ip_limit: int = Field(default=30, ge=1)
+    inference_max_concurrent: int = Field(default=4, ge=1)
+    inference_user_max_concurrent: int = Field(default=1, ge=1)
+    inference_daily_limit: int = Field(default=100, ge=1)
+    upload_user_quota_mb: int = Field(default=256, ge=1)
+    inference_preview_ttl_hours: int = Field(default=24, ge=1)
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
@@ -40,7 +59,7 @@ class Settings(BaseSettings):
     modal_secret: str | None = None
     modal_health_path: str = "/health"
     modal_predict_path: str = "/predict"
-    modal_timeout_seconds: float = 90.0
+    modal_timeout_seconds: float = Field(default=90.0, gt=0)
     modal_request_format: str = "multipart"  # multipart | base64_json | raw
     modal_image_field: str = "image"
     modal_count_field: str | None = None  # Optional dotted path, e.g. data.count
@@ -52,6 +71,23 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("cors_origins")
+    @classmethod
+    def validate_cors_origins(cls, value: str) -> str:
+        origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+        if not origins:
+            raise ValueError("CORS_ORIGINS must contain exact frontend origins.")
+        for origin in origins:
+            parsed = urlsplit(origin)
+            if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+                    or parsed.username is not None or parsed.password is not None
+                    or parsed.path or parsed.query or parsed.fragment
+                    or "*" in origin or "\\" in origin or any(char.isspace() for char in origin)):
+                raise ValueError("CORS_ORIGINS must contain exact HTTP(S) origins without wildcards, credentials, paths, queries, or fragments.")
+            # Accessing port also rejects malformed and out-of-range port values.
+            parsed.port
+        return ",".join(origins)
 
     @property
     def modal_is_configured(self) -> bool:

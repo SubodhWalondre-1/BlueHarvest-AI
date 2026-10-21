@@ -1,16 +1,16 @@
-from datetime import datetime
-from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+import logging
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import CountSession, User
-from app.schemas.count import CountSessionCreate, CountSessionUpdate
-from app.core.time import utcnow_naive
+from app.schemas.count import CountSessionSave, CountSessionUpdate
+from app.services.inference_resource_service import cleanup_pending_images, lock_capacity, mark_unused_session_image
 
 router = APIRouter(prefix="/api/count-sessions", tags=["count sessions and ledger"])
+logger = logging.getLogger(__name__)
 
 
 def _present(item: CountSession) -> dict:
@@ -28,41 +28,26 @@ def _present(item: CountSession) -> dict:
         "image": item.image_path,
         "confidence": f"{confidence}%" if confidence is not None else None,
         "avgLength": f"{item.avg_length_mm:g} mm" if item.avg_length_mm is not None else None,
-        "status": "Demo sample" if item.is_demo else item.status,
+        "status": "Demo sample" if item.is_demo else item.status if item.inference_verified else "Unverified legacy record",
         "method": item.method,
         "is_demo": item.is_demo,
         "is_saved": item.is_saved,
+        "inference_verified": item.inference_verified,
         "processing_time_ms": item.processing_time_ms,
         "created_at": item.created_at.isoformat() + "Z" if item.created_at else None,
     }
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-def create_count_session(body: CountSessionCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if body.is_demo:
-        raise HTTPException(status_code=403, detail={"code": "demo_fixture_read_only", "message": "Demo records are managed by the explicitly labelled demo fixture. Clients cannot submit demo metrics."})
-    if body.count is None:
-        raise HTTPException(status_code=422, detail={"code": "count_required", "message": "A real count result is required to create a completed count session."})
-    now = utcnow_naive()
-    item = CountSession(
-        id=str(uuid4()), batch_code=f"BAT-{now:%y%m%d}-{uuid4().hex[:6].upper()}", user_id=user.id,
-        count=body.count, status=body.status, is_saved=False, is_demo=False,
-        source=body.source, container=body.container, dimensions=body.dimensions,
-        pond_location=body.pond_location or user.pond_location, density=body.density,
-        confidence=body.confidence, avg_length_mm=body.avg_length_mm,
-        processing_time_ms=body.processing_time_ms, method=body.method,
-        image_path=body.image_path or body.image_url, heatmap_path=None,
-    )
-    db.add(item)
-    db.commit()
-    db.refresh(item)
-    return {"session": _present(item)}
+@router.post("")
+def save_inference_session(body: CountSessionSave, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return save_count_session(str(body.session_id), CountSessionUpdate(), user, db)
 
 
 @router.get("")
 def list_count_sessions(
     include_unsaved: bool = Query(default=True),
     include_demo: bool = Query(default=False),
+    include_unverified: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user), db: Session = Depends(get_db),
@@ -70,6 +55,8 @@ def list_count_sessions(
     if include_demo and not settings.demo_mode_enabled:
         raise HTTPException(status_code=403, detail={"code": "demo_mode_disabled", "message": "Demo data mode is disabled."})
     stmt = select(CountSession).where(CountSession.user_id == user.id)
+    if not include_unverified:
+        stmt = stmt.where(or_(CountSession.inference_verified.is_(True), CountSession.is_demo.is_(True)))
     if not include_unsaved:
         stmt = stmt.where(CountSession.is_saved.is_(True))
     if not include_demo:
@@ -92,15 +79,17 @@ def get_count_session(session_id: str, user: User = Depends(get_current_user), d
 
 @router.patch("/{session_id}/save")
 def save_count_session(session_id: str, body: CountSessionUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    lock_capacity(db)
     item = db.scalar(select(CountSession).where(CountSession.id == session_id, CountSession.user_id == user.id))
     if not item:
         item = db.scalar(select(CountSession).where(CountSession.batch_code == session_id, CountSession.user_id == user.id))
     if not item:
         raise HTTPException(status_code=404, detail={"code": "count_session_not_found", "message": "Count session was not found."})
-    if body.is_saved is not None:
-        item.is_saved = body.is_saved
-    if body.status is not None:
-        item.status = body.status
+    if item.is_demo:
+        raise HTTPException(status_code=403, detail={"code": "demo_fixture_read_only", "message": "Demo records cannot be saved as inference results."})
+    if body.is_saved and not item.inference_verified:
+        raise HTTPException(status_code=409, detail={"code": "inference_not_verified", "message": "Run inference again before saving this legacy record."})
+    item.is_saved = body.is_saved
     db.commit()
     db.refresh(item)
     return {"session": _present(item)}
@@ -108,11 +97,20 @@ def save_count_session(session_id: str, body: CountSessionUpdate, user: User = D
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_count_session(session_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    lock_capacity(db)
     item = db.scalar(select(CountSession).where(CountSession.id == session_id, CountSession.user_id == user.id))
     if not item:
         item = db.scalar(select(CountSession).where(CountSession.batch_code == session_id, CountSession.user_id == user.id))
     if not item:
         raise HTTPException(status_code=404, detail={"code": "count_session_not_found", "message": "Count session was not found."})
+    image_path = item.image_path
     db.delete(item)
+    db.flush()
+    mark_unused_session_image(db, user.id, image_path)
     db.commit()
+    try:
+        cleanup_pending_images(db, user.id)
+    except Exception:
+        db.rollback()
+        logger.exception("Deleted session image cleanup will be retried on startup or the next upload.")
     return None

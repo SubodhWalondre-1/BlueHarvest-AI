@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models import User, UserSettings
-from app.schemas.user import SettingsUpdate, UserUpdate
+from app.schemas.user import ContactChangeConfirm, ContactChangeRequest, SettingsUpdate, UserUpdate
+from app.services.contact_change_service import confirm_contact_change, request_contact_change
 from app.services.auth_service import public_user
 from app.services.profile_service import ensure_settings, public_settings
 
@@ -19,32 +21,35 @@ def get_profile(user: User = Depends(get_current_user)):
 @router.patch("/me")
 def update_profile(body: UserUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     changes = body.model_dump(exclude_unset=True)
+    for field in ("email", "phone"):
+        if field in changes:
+            value = str(changes[field]).lower() if field == "email" else changes[field]
+            if value != getattr(user, field):
+                raise HTTPException(status_code=409, detail={"code": "contact_verification_required", "message": "Verify contact changes using your current password and a verification code."})
+            del changes[field]
     for field, value in changes.items():
         if field == "username" and value:
-            existing = db.scalar(select(User.id).where(User.username == value.strip(), User.id != user.id))
+            existing = db.scalar(select(User.id).where(User.username == value, User.id != user.id))
             if existing:
                 raise HTTPException(status_code=409, detail={"code": "username_in_use", "message": "That username is already taken."})
-        if field == "email" and value:
-            value = str(value).lower()
-            existing = db.scalar(select(User.id).where(User.email == value, User.id != user.id))
-            if existing:
-                raise HTTPException(status_code=409, detail={"code": "email_in_use", "message": "That email is already linked to another account."})
-        if field == "phone" and value:
-            existing = db.scalar(select(User.id).where(User.phone == value, User.id != user.id))
-            if existing:
-                raise HTTPException(status_code=409, detail={"code": "phone_in_use", "message": "That phone number is already linked to another account."})
-        if field == "username": user.username = value.strip() if value else value
-        elif field == "display_role": user.display_role = value.strip() if value else value
-        elif field == "full_name": user.full_name = value.strip() if value else value
-        elif field == "email":
-            if user.email != value:
-                user.email_verified = False
-            user.email = value
-        elif field == "phone": user.phone = value.strip() if value else None
-        elif field == "pond_location": user.pond_location = value.strip() if value else value
-    db.commit()
+        setattr(user, field, value)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail={"code": "profile_conflict", "message": "That username is already taken."}) from exc
     db.refresh(user)
     return {"user": public_user(user)}
+
+
+@router.post("/me/contact-change/request")
+async def contact_change_request(body: ContactChangeRequest, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return await request_contact_change(db, request, user, body)
+
+
+@router.post("/me/contact-change/confirm")
+def contact_change_confirm(body: ContactChangeConfirm, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return {"user": public_user(confirm_contact_change(db, request, user, body))}
 
 
 @router.get("/me/settings")
