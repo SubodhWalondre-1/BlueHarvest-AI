@@ -227,10 +227,29 @@ async def count_fish_image(image_bytes: bytes, filename: str, content_type: str 
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={"code": "model_service_auth_failed", "message": "Modal rejected the inference credentials. Rotate and verify MODAL_KEY and MODAL_SECRET."},
         )
+    if response.status_code == 422 and settings.modal_request_format.strip().lower() == "multipart":
+        current_field = (settings.modal_image_field or "file").strip() or "file"
+        alt_field = "image" if current_field == "file" else "file"
+        alt_kwargs = {"files": {alt_field: (filename, image_bytes, safe_content_type)}, "headers": dict(headers)}
+        try:
+            async with httpx.AsyncClient(timeout=settings.modal_timeout_seconds, follow_redirects=False) as client:
+                retry_resp = await client.post(_url(settings.modal_predict_path), **alt_kwargs)
+                if 200 <= retry_resp.status_code < 300:
+                    response = retry_resp
+        except Exception:
+            pass
+
     if not 200 <= response.status_code < 300:
+        err_detail = ""
+        try:
+            err_text = response.text.strip()
+            if err_text:
+                err_detail = f" Detail: {err_text[:200]}"
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"code": "model_service_error", "message": f"Modal inference returned HTTP {response.status_code}. No count was produced."},
+            detail={"code": "model_service_error", "message": f"Modal inference returned HTTP {response.status_code}.{err_detail} No count was produced."},
         )
     try:
         payload = response.json()

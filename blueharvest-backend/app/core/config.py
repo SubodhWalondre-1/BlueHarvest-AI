@@ -61,8 +61,8 @@ class Settings(BaseSettings):
     modal_predict_path: str = "/predict"
     modal_timeout_seconds: float = Field(default=90.0, gt=0)
     modal_request_format: str = "multipart"  # multipart | base64_json | raw
-    modal_image_field: str = "image"
-    modal_count_field: str | None = None  # Optional dotted path, e.g. data.count
+    modal_image_field: str = "file"
+    modal_count_field: str | None = "count"  # Optional dotted path, e.g. count or data.count
     modal_points_field: str | None = None  # Optional dotted path to an explicit list of point predictions
 
     model_config = SettingsConfigDict(
