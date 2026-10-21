@@ -18,7 +18,7 @@ async def lifespan(_app: FastAPI):
     if settings.app_env.lower() != "test":
         with SessionLocal() as db:
             cleanup_expired_inference_jobs(db)
-    if settings.demo_mode_enabled and settings.app_env.lower() in {"development", "dev"}:
+    if settings.demo_mode_enabled:
         db = SessionLocal()
         try:
             seed_demo_data(db)

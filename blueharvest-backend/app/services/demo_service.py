@@ -23,7 +23,7 @@ DEMO_RECORDS = [
 
 
 def seed_demo_data(db: Session) -> None:
-    if not settings.demo_mode_enabled or settings.app_env.lower() not in {"development", "dev"}:
+    if not settings.demo_mode_enabled:
         return
     user = db.scalar(select(User).where(User.username == DEMO_USER["username"]))
     if user is None:
