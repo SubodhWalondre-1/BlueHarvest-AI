@@ -1889,19 +1889,8 @@ export default function HomePage({
               </div>
             </div>
 
-            <div className="batch-modal-meta-grid">
-              <div className="modal-meta-row">
-                <span className="meta-lbl">Dimensions</span>
-                <span className="meta-val">1280 x 720 px</span>
-              </div>
-              <div className="modal-meta-row">
-                <span className="meta-lbl">Source Type</span>
-                <span className="meta-val">Camera / Upload</span>
-              </div>
-              <div className="modal-meta-row">
-                <span className="meta-lbl">Confidence</span>
-                <span className="meta-val text-green">98.4%</span>
-              </div>
+            
+              {/* Clean metadata grid focused on operational context */}
               <div className="modal-meta-row">
                 <span className="meta-lbl">Price Breakdown</span>
                 <span className="meta-val">₹0.025/spawn + ₹50 packing</span>
