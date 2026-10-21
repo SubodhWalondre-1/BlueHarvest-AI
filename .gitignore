@@ -67,10 +67,29 @@ run.md
 BACKEND_IMPLEMENTATION_PLAN.md
 backend/README_MODAL_INTEGRATION.md
 README_MODAL_INTEGRATION.md
-docs/
+docs/API_REFERENCE.md
+docs/ARCHITECTURE.md
+docs/AUTHENTICATION.md
+docs/BENCHMARKS.md
+docs/CHANGELOG.md
+docs/cookie-csrf-protection.md
+docs/DATASET_PREPARATION.md
+docs/DEPLOYMENT_GUIDE.md
+docs/FRONTEND_DESIGN_SYSTEM.md
+docs/MORTALITY_SURVIVAL_MODEL.md
+docs/P2PNET_MODEL.md
+docs/PRICING_ENGINE.md
+docs/private-uploads.md
+docs/ROADMAP.md
+docs/security-rate-limits.md
+docs/SECURITY.md
+docs/TESTING_STRATEGY.md
+docs/TROUBLESHOOTING.md
+docs/trusted-inference-results.md
 
 # Standalone manual counting and utility tools
 fish_remover.html
 manual_counting.html
+
 
 
