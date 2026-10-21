@@ -2169,6 +2169,7 @@ export default function HomePage({
             </div>
 
             <div className="batch-modal-actions-row">
+              {/* Streamlined action footer: CSV export and close */}
               <button type="button" className="modal-analysis-btn"><BarChart3 size={16} /><span>Analysis</span></button> <button 
                 type="button" 
                 className="modal-csv-btn"
