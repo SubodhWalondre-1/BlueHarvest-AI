@@ -2,6 +2,9 @@
   publish = "dist"
   command = "npm run build"
 
+[build.environment]
+  VITE_API_URL = "https://blueharvest-api.onrender.com"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
