@@ -1884,8 +1884,8 @@ export default function HomePage({
                 <span className="modal-count-sub">Total Spawn</span>
               </div>
               <div className="batch-modal-density-stat">
-                <span className="modal-density-val">{'4.8 spawns/cm²'}</span>
-                <span className="modal-density-sub">Estimated Valuation</span>
+                <span className="modal-density-val">{formatPriceINR(selectedBatchModal.count)}</span>
+                <span className="modal-density-sub">Price</span>
               </div>
             </div>
 
