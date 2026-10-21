@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     modal_count_field: str | None = "count"  # Optional dotted path, e.g. count or data.count
     modal_points_field: str | None = None  # Optional dotted path to an explicit list of point predictions
 
+    # Cloudinary permanent image storage (optional; falls back to local storage if unset)
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: str | None = None
+    cloudinary_api_secret: str | None = None
+    cloudinary_url: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -96,6 +102,13 @@ class Settings(BaseSettings):
             and self.modal_base_url.strip()
             and self.modal_key
             and self.modal_secret
+        )
+
+    @property
+    def cloudinary_is_configured(self) -> bool:
+        return bool(
+            self.cloudinary_url
+            or (self.cloudinary_cloud_name and self.cloudinary_api_key and self.cloudinary_api_secret)
         )
 
     @property

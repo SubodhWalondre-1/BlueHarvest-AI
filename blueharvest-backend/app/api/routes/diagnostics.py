@@ -44,7 +44,12 @@ def diagnostics(db: Session = Depends(get_db)):
             "available": None if modal_configured else False,  # Reachability is checked by authenticated GET /api/model/health.
             "message": "Modal credentials are configured; use GET /api/model/health to check live reachability." if modal_configured else "Set MODAL_ENABLED, MODAL_KEY, and MODAL_SECRET to enable the real P2PNet inference service.",
         },
-        "storage": {"status": "ok" if upload_writable else "error", "upload_directory_ready": upload_writable},
+        "storage": {
+            "status": "ok" if (upload_writable or settings.cloudinary_is_configured) else "error",
+            "provider": "cloudinary" if settings.cloudinary_is_configured else "local_disk",
+            "cloudinary_configured": settings.cloudinary_is_configured,
+            "upload_directory_ready": upload_writable,
+        },
         "providers": {
             "google_oauth_configured": bool(settings.google_client_id),
             "email_delivery_configured": bool(settings.smtp_host and settings.smtp_from_email),

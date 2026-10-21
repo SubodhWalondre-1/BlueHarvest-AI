@@ -17,6 +17,7 @@ from app.services.image_validation import read_and_validate_image
 from app.services.counting_service import check_modal_health, count_fish_image
 from app.services.rate_limit_service import enforce_rate_limit
 from app.services.inference_resource_service import abandon_inference_job, lock_inference_job, reserve_inference_job
+from app.services.storage_service import upload_image_to_storage
 
 router = APIRouter(prefix="/api", tags=["image processing"])
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ async def image_processing(
     job_id = str(uuid4())
     reserve_inference_job(db, request, _user.id, job_id, unique_filename, len(data))
     try:
-        dest_path.write_bytes(data)
+        image_url = upload_image_to_storage(data, unique_filename)
         async with asyncio.timeout(settings.modal_timeout_seconds):
             result = await count_fish_image(data, image_info["filename"], image.content_type)
         job = lock_inference_job(db, job_id)
