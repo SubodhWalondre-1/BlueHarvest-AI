@@ -1885,7 +1885,7 @@ export default function HomePage({
               </div>
               <div className="batch-modal-density-stat">
                 <span className="modal-density-val">{'4.8 spawns/cm²'}</span>
-                <span className="modal-density-sub">Packing Density</span>
+                <span className="modal-density-sub">Estimated Valuation</span>
               </div>
             </div>
 
