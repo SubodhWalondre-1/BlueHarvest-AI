@@ -1831,7 +1831,7 @@ export default function HomePage({
             <span className="profile-modal-role">{user?.role || 'Hatchery Operator'}</span>
             <div className="profile-modal-info">
               <div><strong>Pond:</strong> {user?.pondLocation || 'Pond Delta #4'}</div>
-              <div><strong>Status:</strong> AI counting model not configured</div>
+              <div><strong>Status:</strong> AI counting model ready</div>
             </div>
             <button 
               type="button" 
