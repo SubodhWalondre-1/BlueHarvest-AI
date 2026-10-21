@@ -6,10 +6,11 @@
  */
 
 const ACCESS_TOKEN_KEY = 'bh_access_token';
+const CSRF_HEADERS = { 'X-CSRF-Protection': '1' };
 let accessToken = null;
 
 export const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL;
+  const envUrl = import.meta.env?.VITE_API_URL;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
     const trimmed = envUrl.trim().replace(/\/+$/, '');
     if (typeof window !== 'undefined') {
@@ -63,6 +64,7 @@ async function requestTokenRefresh() {
       const response = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
+        headers: CSRF_HEADERS,
       });
       if (!response.ok) {
         clearAccessToken();
@@ -105,8 +107,11 @@ async function parseError(response, fallback) {
 }
 
 export async function apiRequest(path, options = {}) {
-  const { auth = true, _retry = false, ...fetchOptions } = options;
+  const { auth = true, _retry = false, responseType = 'json', ...fetchOptions } = options;
   const headers = new Headers(fetchOptions.headers || {});
+  if (path === '/api/auth/refresh' || path === '/api/auth/logout') {
+    headers.set('X-CSRF-Protection', CSRF_HEADERS['X-CSRF-Protection']);
+  }
   if (auth) {
     const token = getStoredToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -130,7 +135,20 @@ export async function apiRequest(path, options = {}) {
 
   if (!response.ok) await parseError(response, 'BlueHarvest API request failed');
   if (response.status === 204) return null;
-  return response.json();
+  return responseType === 'blob' ? response.blob() : response.json();
+}
+
+export function getPrivateImagePath(source) {
+  if (typeof source !== 'string') return null;
+  const base = getApiBaseUrl();
+  const path = source.startsWith(base) ? source.slice(base.length) : source;
+  return /^\/api\/uploads\/[a-f0-9]{32}\.(jpg|png|webp|bmp|tiff)$/.test(path) ? path : null;
+}
+
+export async function fetchUploadedImage(source, { signal } = {}) {
+  const path = getPrivateImagePath(source);
+  if (!path) throw new Error('Invalid private image URL.');
+  return apiRequest(path, { signal, responseType: 'blob', cache: 'no-store', redirect: 'error' });
 }
 
 function jsonBody(value) {
@@ -239,6 +257,18 @@ export async function getUserSettings() {
   return data.settings;
 }
 
+export async function requestContactChange({ channel, value, password }) {
+  return apiRequest('/api/users/me/contact-change/request', {
+    method: 'POST', body: jsonBody({ channel, value, password }),
+  });
+}
+
+export async function confirmContactChange({ challengeId, code, password }) {
+  return apiRequest('/api/users/me/contact-change/confirm', {
+    method: 'POST', body: jsonBody({ challenge_id: challengeId, code, password }),
+  });
+}
+
 export async function updateUserSettings(payload) {
   const data = await apiRequest('/api/users/me/settings', {
     method: 'PATCH',
@@ -251,36 +281,18 @@ export async function updateUserSettings(payload) {
   return data.settings;
 }
 
-export async function listCountSessions({ includeDemo = false, includeUnsaved = true } = {}) {
+export async function listCountSessions({ includeDemo = false, includeUnsaved = false } = {}) {
   const params = new URLSearchParams({ include_demo: String(includeDemo), include_unsaved: String(includeUnsaved) });
   const data = await apiRequest(`/api/count-sessions?${params.toString()}`);
   return data.items || [];
 }
 
-export async function createCountSession(payload) {
-  const body = {
-    count: payload.count,
-    status: payload.status || 'completed',
-    source: payload.source || 'Uploaded',
-    container: payload.container || null,
-    dimensions: payload.dimensions || null,
-    pond_location: payload.pondLocation || null,
-    density: payload.density || null,
-    confidence: Number.isFinite(payload.confidence) ? payload.confidence : null,
-    avg_length_mm: Number.isFinite(payload.avgLengthMm) ? payload.avgLengthMm : null,
-    processing_time_ms: Number.isFinite(payload.processingTimeMs) ? payload.processingTimeMs : null,
-    method: payload.method || null,
-    image_path: payload.imagePath || payload.imageUrl || payload.image || null,
-    image_url: payload.imageUrl || payload.imagePath || payload.image || null,
-    is_demo: Boolean(payload.isDemo),
-  };
-  const data = await apiRequest('/api/count-sessions', { method: 'POST', body: jsonBody(body) });
-  return data.session;
-}
-
-export async function saveCountSession(sessionId, isSaved = true) {
-  const data = await apiRequest(`/api/count-sessions/${encodeURIComponent(sessionId)}/save`, {
-    method: 'PATCH', body: jsonBody({ is_saved: isSaved }),
+export async function saveCountSession(sessionId) {
+  if (typeof sessionId !== 'string' || !sessionId.trim()) {
+    throw new Error('A backend inference session is required to save this result.');
+  }
+  const data = await apiRequest('/api/count-sessions', {
+    method: 'POST', body: jsonBody({ session_id: sessionId }),
   });
   return data.session;
 }
@@ -307,9 +319,10 @@ export async function getDemoStatus() {
   return apiRequest('/api/demo/status');
 }
 
-export async function processImage(imageFile) {
+export async function processImage(imageFile, source = 'Uploaded') {
   const formData = new FormData();
   formData.append('image', imageFile);
+  formData.append('source', source);
   return apiRequest('/api/image-processing', { method: 'POST', body: formData });
 }
 
@@ -326,6 +339,7 @@ export async function getDiagnostics() {
 export default {
   getApiBaseUrl,
   apiRequest,
+  fetchUploadedImage,
   loginUser,
   signupUser,
   loginWithGoogleCredential,
@@ -336,10 +350,11 @@ export default {
   confirmPasswordReset,
   getCurrentUser,
   updateProfile,
+  requestContactChange,
+  confirmContactChange,
   getUserSettings,
   updateUserSettings,
   listCountSessions,
-  createCountSession,
   saveCountSession,
   deleteCountSession,
   getDashboardSummary,

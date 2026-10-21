@@ -1,0 +1,47 @@
+.profile-edit-modal-card {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.contact-verification {
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e3a5f;
+}
+
+.contact-verification p {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.contact-verification-row {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.contact-verification-error {
+  margin-top: 12px !important;
+  color: #b91c1c;
+}
+
+.contact-development-code {
+  font-family: monospace;
+}
+
+.profile-edit-form .contact-verification .form-input {
+  padding-left: 14px;
+}
+
+[data-theme="dark"] .contact-verification {
+  background: #0f253f;
+  border-color: #2c527b;
+  color: #dbeafe;
+}
+
+[data-theme="dark"] .contact-verification-error {
+  color: #fca5a5;
+}

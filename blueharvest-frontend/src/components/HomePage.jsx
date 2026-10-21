@@ -50,7 +50,9 @@ import insightsBg from '../assets/insightsBg.png';
 import outputCountBg from '../assets/outputCountBg.png';
 import outputCardMainBg from '../assets/outputCardMainBg.png';
 import DualFishLoader, { DualFishSpinner } from './DualFishLoader';
-import { getApiBaseUrl, processImage, listCountSessions, createCountSession, saveCountSession, deleteCountSession, getDashboardSummary, getDemoStatus, getUserSettings, updateProfile, updateUserSettings, getNotifications, markNotificationRead } from '../api/client';
+import AuthenticatedImage from './AuthenticatedImage';
+import ContactVerification from './ContactVerification';
+import { getApiBaseUrl, processImage, listCountSessions, saveCountSession, deleteCountSession, getDashboardSummary, getDemoStatus, getUserSettings, updateProfile, updateUserSettings, getNotifications, markNotificationRead } from '../api/client';
 import { applyTheme, setupSystemThemeListener, THEME_STORAGE_KEY } from '../utils/theme';
 
 // Authentic Fish icon matching insightsReference.png
@@ -352,6 +354,8 @@ export default function HomePage({
     location: user?.pondLocation || ''
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const contactChangesPending = editFormData.email.trim().toLowerCase() !== profileEmail.toLowerCase()
+    || (editFormData.phone.replace(/[\s().-]/g, '') || null) !== (profilePhone.replace(/[\s().-]/g, '') || null);
 
   // Sync and listen to active theme changes (including OS system preference)
   useEffect(() => {
@@ -372,7 +376,6 @@ export default function HomePage({
   const [cameraFacingMode, setCameraFacingMode] = useState('environment');
   const [isCameraStarting, setIsCameraStarting] = useState(false);
   const [cameraError, setCameraError] = useState(null);
-  const [currentScanSource, setCurrentScanSource] = useState('Uploaded');
 
   // Farm Insights are calculated from saved backend ledger records, not hard-coded metrics.
   const [activeInsightsRange, setActiveInsightsRange] = useState('Today');
@@ -526,7 +529,7 @@ export default function HomePage({
     let alive = true;
     setHistoryLoading(true);
     setHistoryError('');
-    listCountSessions({ includeDemo: demoModeEnabled, includeUnsaved: true })
+    listCountSessions({ includeDemo: demoModeEnabled })
       .then((items) => { if (alive) setHistoryItems(items.map(mapSessionToHistoryItem)); })
       .catch((error) => { if (alive) { setHistoryItems([]); setHistoryError(error.message || 'Could not load the saved ledger.'); } })
       .finally(() => { if (alive) setHistoryLoading(false); });
@@ -570,7 +573,7 @@ export default function HomePage({
       })
       .finally(() => { if (alive) setInsightsLoading(false); });
     return () => { alive = false; };
-  }, [user?.id, activeInsightsRange, demoModeEnabled]);
+  }, [user?.id, activeInsightsRange, demoModeEnabled, historyItems]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -705,10 +708,12 @@ export default function HomePage({
     setIsAnalyzing(true);
     setScanResult(null);
     setScanError(null);
-    setCurrentScanSource(source);
 
     try {
-      const data = await processImage(file);
+      const data = await processImage(file, source);
+      if (!data.session_id) {
+        throw new Error('The backend did not store an inference session. Please run the scan again.');
+      }
       const rawCount = data.final_fish_count ?? data.final_count;
       const count = Number(rawCount);
       if (rawCount === undefined || rawCount === null || !Number.isFinite(count) || count < 0) {
@@ -731,18 +736,15 @@ export default function HomePage({
       const channel = stats.selected_channel_name ?? data.method ?? null;
 
       setScanResult({
+        sessionId: data.session_id,
         count,
         confidence,
         density,
         avgLength,
         processingTime,
-        processingTimeMs: stats.processing_time_ms !== null && stats.processing_time_ms !== undefined && Number.isFinite(Number(stats.processing_time_ms)) ? Number(stats.processing_time_ms) : null,
-        confidenceValue: typeof rawConfidence === 'number' && rawConfidence >= 0 && rawConfidence <= 1 ? rawConfidence : null,
-        avgLengthMm: Number.isFinite(Number(rawAvgLength)) && rawAvgLength !== null ? Number(rawAvgLength) : null,
         channel,
         heatmapImg: data.final_heatmap || data.heatmap || data.components || null,
         image: data.image_url || data.image_path || url,
-        rawResponse: data,
       });
     } catch (err) {
       console.error('BlueHarvest backend image-processing error:', err);
@@ -760,33 +762,12 @@ export default function HomePage({
   };
 
   const handleSaveToLedger = async () => {
-    if (!scanResult || !Number.isFinite(Number(scanResult.count))) return;
+    if (!scanResult?.sessionId || isSavingCount) return;
     setIsSavingCount(true);
     setScanError(null);
     try {
-      const imageToSave = scanResult.image || scanningImage || null;
-      const created = await createCountSession({
-        count: Number(scanResult.count),
-        source: currentScanSource || 'Uploaded',
-        container: null,
-        dimensions: null,
-        pondLocation: user?.pondLocation || profileLocation || null,
-        density: typeof scanResult.density === 'string' ? scanResult.density : null,
-        confidence: scanResult.confidenceValue,
-        avgLengthMm: scanResult.avgLengthMm,
-        processingTimeMs: scanResult.processingTimeMs,
-        method: scanResult.channel || null,
-        image: imageToSave,
-        isDemo: false,
-      });
-      if (imageToSave) {
-        try {
-          sessionStorage.setItem(`bh_img_${created.id}`, imageToSave);
-          sessionStorage.setItem(`bh_img_${created.session_id}`, imageToSave);
-        } catch { /* storage optional */ }
-      }
-      await saveCountSession(created.session_id, true);
-      const rows = await listCountSessions({ includeDemo: demoModeEnabled, includeUnsaved: true });
+      await saveCountSession(scanResult.sessionId);
+      const rows = await listCountSessions({ includeDemo: demoModeEnabled });
       setHistoryItems(rows.map(mapSessionToHistoryItem));
       setScanResult(null);
       showProfileToastMsg('Count saved to the Hatchery Ledger');
@@ -1272,8 +1253,9 @@ export default function HomePage({
                         >
                           {/* Left Square Thumbnail */}
                           <div className="history-thumb-box">
-                            <img 
+                            <AuthenticatedImage
                               src={item.image || heroImage} 
+                              fallbackSrc={heroImage}
                               alt={`Fish count ${item.id}`} 
                               className="history-thumb-img" 
                             />
@@ -1910,8 +1892,9 @@ export default function HomePage({
             </div>
 
             <div className="batch-modal-image-wrapper">
-              <img 
+              <AuthenticatedImage
                 src={selectedBatchModal.image || heroImage} 
+                fallbackSrc={heroImage}
                 alt={selectedBatchModal.id} 
                 className="batch-modal-img" 
                 onError={(e) => { e.currentTarget.src = heroImage; }}
@@ -2302,8 +2285,9 @@ export default function HomePage({
 
               {/* Detection / Heatmap Preview Image */}
               <div className="output-image-card">
-                <img 
+                <AuthenticatedImage
                   src={scanResult.heatmapImg || scanningImage || trayImage} 
+                  fallbackSrc={trayImage}
                   alt="Fish fry detection preview" 
                   className="output-detection-img" 
                 />
@@ -2369,8 +2353,9 @@ export default function HomePage({
               </button>
             </div>
             <div className="lightbox-body">
-              <img 
+              <AuthenticatedImage
                 src={scanResult?.heatmapImg || scanningImage || trayImage} 
+                fallbackSrc={trayImage}
                 alt="High-resolution fish fry detection" 
                 className="lightbox-full-img"
               />
@@ -2407,6 +2392,7 @@ export default function HomePage({
               className="profile-edit-form"
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (contactChangesPending) return;
                 setIsSavingProfile(true);
                 try {
                   const result = await updateProfile({
@@ -2487,10 +2473,17 @@ export default function HomePage({
                     placeholder="+91 98765 43210"
                     value={editFormData.phone}
                     onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                    required
                   />
                 </div>
               </div>
+
+              <ContactVerification email={editFormData.email} phone={editFormData.phone}
+                currentEmail={profileEmail} currentPhone={profilePhone}
+                onVerified={(updated) => {
+                  setProfileEmail(updated.email);
+                  setProfilePhone(updated.phone || '');
+                  showProfileToastMsg('Contact details verified and updated');
+                }} />
 
               <div className="profile-edit-btn-row">
                 <button 
@@ -2504,7 +2497,7 @@ export default function HomePage({
                 <button 
                   type="submit" 
                   className="action-btn primary-btn"
-                  disabled={isSavingProfile}
+                  disabled={isSavingProfile || contactChangesPending}
                 >
                   {isSavingProfile ? 'Saving…' : 'Save Changes'}
                 </button>
