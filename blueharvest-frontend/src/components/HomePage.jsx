@@ -2001,6 +2001,27 @@ export default function HomePage({
                         </div>
                       </div>
 
+                      {/* Scenario 3: After putting spawn in pond / fish */}
+                      <div className="analysis-scenario-item pond-stocking">
+                        <div className="scenario-top-row">
+                          <span className="scenario-title">Pond Stocking (After Putting Spawn)</span>
+                          <span className="scenario-rate-badge rate-70">70% Mortality</span>
+                        </div>
+                        <div className="scenario-numbers-row">
+                          <div className="scenario-stat-col">
+                            <span className="scenario-stat-lbl">Estimated Loss</span>
+                            <span className="scenario-loss-val text-red">-{analysis.pond70.loss.toLocaleString()}</span>
+                          </div>
+                          <div className="scenario-arrow-col">→</div>
+                          <div className="scenario-stat-col">
+                            <span className="scenario-stat-lbl">Surviving Fish Count</span>
+                            <span className="scenario-surviving-val text-amber">{analysis.pond70.surviving.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <div className="scenario-progress-track">
+                          <div className="scenario-progress-bar bar-amber" style={{ width: '30%' }} />
+                        </div>
+                      </div>
                       {/* Scenario 2: 12 to 24 hr transportation */}
                       <div className="analysis-scenario-item transit-long">
                         <div className="scenario-top-row">
@@ -2099,6 +2120,27 @@ export default function HomePage({
                         </div>
                       </div>
 
+                      {/* Scenario 3: After putting spawn in pond / fish */}
+                      <div className="analysis-scenario-item pond-stocking">
+                        <div className="scenario-top-row">
+                          <span className="scenario-title">Pond Stocking (After Putting Spawn)</span>
+                          <span className="scenario-rate-badge rate-70">70% Mortality</span>
+                        </div>
+                        <div className="scenario-numbers-row">
+                          <div className="scenario-stat-col">
+                            <span className="scenario-stat-lbl">Estimated Loss</span>
+                            <span className="scenario-loss-val text-red">-{analysis.pond70.loss.toLocaleString()}</span>
+                          </div>
+                          <div className="scenario-arrow-col">→</div>
+                          <div className="scenario-stat-col">
+                            <span className="scenario-stat-lbl">Surviving Fish Count</span>
+                            <span className="scenario-surviving-val text-amber">{analysis.pond70.surviving.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <div className="scenario-progress-track">
+                          <div className="scenario-progress-bar bar-amber" style={{ width: '30%' }} />
+                        </div>
+                      </div>
                       {/* Scenario 2: 12 to 24 hr transportation */}
                       <div className="analysis-scenario-item transit-long">
                         <div className="scenario-top-row">
