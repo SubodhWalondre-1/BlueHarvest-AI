@@ -11,7 +11,7 @@ from app.core.config import settings
 
 
 @pytest.fixture()
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
     test_engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -28,12 +28,13 @@ def client(monkeypatch):
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    old_env, old_expose = settings.app_env, settings.dev_expose_otp
-    settings.app_env = "test"
-    settings.dev_expose_otp = True
+    # Keep tests independent of local credentials and uploaded files.
+    monkeypatch.setattr(settings, "app_env", "test")
+    monkeypatch.setattr(settings, "dev_expose_otp", True)
+    monkeypatch.setattr(settings, "modal_enabled", False)
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
     with TestClient(app) as test_client:
         yield test_client
-    settings.app_env, settings.dev_expose_otp = old_env, old_expose
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=test_engine)
     test_engine.dispose()

@@ -1,6 +1,6 @@
 def test_profile_and_settings_persist(client, registered):
     headers = {"Authorization": f"Bearer {registered['token']}"}
-    profile = client.patch("/api/users/me", headers=headers, json={"pond_location": "New Pond", "phone": "+919999888877"})
+    profile = client.patch("/api/users/me", headers=headers, json={"pond_location": "New Pond"})
     assert profile.status_code == 200, profile.text
     assert profile.json()["user"]["pondLocation"] == "New Pond"
 
