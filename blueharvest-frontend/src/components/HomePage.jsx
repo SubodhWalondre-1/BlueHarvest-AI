@@ -1230,7 +1230,7 @@ export default function HomePage({
                           role="button"
                           tabIndex={0}
                         >
-                          {/* Left Square Thumbnail */}
+                          {/* Left Square Thumbnail: preserved for uploaded files and live captures */}
                           <div className="history-thumb-box">
                             <img 
                               src={item.image || heroImage} 
