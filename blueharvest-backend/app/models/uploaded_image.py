@@ -14,5 +14,7 @@ class UploadedImage(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     media_type: Mapped[str] = mapped_column(String(50), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    storage_provider: Mapped[str] = mapped_column(String(24), default="local", server_default="local", nullable=False)
+    storage_asset_id: Mapped[str | None] = mapped_column(String(128))
     cleanup_pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)

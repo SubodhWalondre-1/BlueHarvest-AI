@@ -17,4 +17,5 @@ class InferenceJob(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     filename: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage_provider: Mapped[str] = mapped_column(String(24), default="local", server_default="local", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, index=True, nullable=False)
