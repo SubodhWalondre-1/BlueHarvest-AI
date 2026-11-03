@@ -120,6 +120,12 @@ def test_wrong_password_cannot_request_code(client, registered):
         provider.close()
 
 
+@pytest.mark.parametrize("field", ["email_verified", "phone_verified", "is_active", "id"])
+def test_clients_cannot_set_profile_security_fields(client, registered, field):
+    result = client.patch("/api/users/me", headers=headers(registered), json={field: True})
+    assert result.status_code == 422
+
+
 def test_bad_code_attempts_are_bounded_and_expired_codes_fail(client, registered):
     challenge = request_change(client, registered).json()
     wrong = "000000" if challenge["development_code"] != "000000" else "111111"
