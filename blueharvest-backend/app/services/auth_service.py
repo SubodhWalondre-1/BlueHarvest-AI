@@ -18,6 +18,7 @@ def public_user(user: User) -> dict:
         "phone": user.phone,
         "emailVerified": user.email_verified,
         "phoneVerified": user.phone_verified,
+        "isDemo": user.is_demo,
         "role": user.display_role,
         "pondLocation": user.pond_location,
         "createdAt": user.created_at.isoformat() + "Z" if user.created_at else None,

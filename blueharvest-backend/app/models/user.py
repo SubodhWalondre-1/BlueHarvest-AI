@@ -18,6 +18,7 @@ class User(Base):
     pond_location: Mapped[str | None] = mapped_column(String(200))
     display_role: Mapped[str] = mapped_column(String(80), default="Aquafarm Operator", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
