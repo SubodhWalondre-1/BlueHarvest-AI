@@ -8,9 +8,26 @@ from app.models import User, UserSettings
 from app.schemas.user import ContactChangeConfirm, ContactChangeRequest, SettingsUpdate, UserUpdate
 from app.services.contact_change_service import confirm_contact_change, request_contact_change
 from app.services.auth_service import public_user
-from app.services.profile_service import ensure_settings, public_settings
 
 router = APIRouter(prefix="/api/users", tags=["profile and settings"])
+
+
+def ensure_settings(db: Session, user: User) -> UserSettings:
+    if user.settings is None:
+        user.settings = UserSettings(user_id=user.id)
+        db.add(user.settings)
+        db.commit()
+        db.refresh(user.settings)
+    return user.settings
+
+
+def public_settings(settings: UserSettings) -> dict:
+    return {
+        "notificationsEnabled": settings.notifications_enabled,
+        "language": settings.language,
+        "theme": settings.theme,
+        "updatedAt": settings.updated_at.isoformat() + "Z" if settings.updated_at else None,
+    }
 
 
 @router.get("/me")
