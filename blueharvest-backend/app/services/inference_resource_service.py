@@ -1,6 +1,6 @@
 from datetime import timedelta
 from math import ceil
-import re
+import logging
 
 from fastapi import HTTPException, Request
 from sqlalchemy import delete, func, select, update
@@ -9,8 +9,11 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.time import utcnow_naive
-from app.models import CountSession, InferenceCapacity, InferenceJob, UploadedImage
+from app.models import CountSession, InferenceCapacity, InferenceJob, UploadedImage, User
 from app.services.rate_limit_service import enforce_rate_limit
+from app.services.storage_service import delete_stored_image, upload_path
+
+logger = logging.getLogger(__name__)
 
 
 def lock_capacity(db: Session) -> None:
@@ -21,15 +24,19 @@ def lock_capacity(db: Session) -> None:
 
 
 def _upload_path(filename: str):
-    if not re.fullmatch(r"[a-f0-9]{32}\.(jpg|png|webp|bmp|tiff)", filename):
-        raise ValueError("Invalid upload filename.")
-    return settings.uploads_path / filename
+    return upload_path(filename)
 
 
 def _cleanup_expired(db: Session, now) -> None:
-    for job in db.scalars(select(InferenceJob).where(InferenceJob.expires_at <= now)):
+    for job in db.scalars(select(InferenceJob).where(InferenceJob.expires_at <= now).limit(10)):
         if db.get(UploadedImage, job.filename) is None:
-            _upload_path(job.filename).unlink(missing_ok=True)
+            try:
+                delete_stored_image(job.filename, job.storage_provider)
+            except Exception:
+                logger.warning("Expired upload cleanup deferred for %s.", job.filename, exc_info=True)
+                if job.storage_provider != "local":
+                    break
+                continue
         db.delete(job)
     db.flush()
 
@@ -43,17 +50,20 @@ def cleanup_expired_inference_jobs(db: Session) -> None:
     db.commit()
 
 
-def reserve_inference_job(db: Session, request: Request, user_id: str, job_id: str, filename: str, size_bytes: int) -> None:
+def reserve_inference_job(db: Session, request: Request, user_id: str, job_id: str, filename: str, size_bytes: int, provider: str = "local") -> None:
     lock_capacity(db)
     now = utcnow_naive()
     _cleanup_expired(db, now)
     _cleanup_previews(db, now, user_id)
     _cleanup_pending_images(db, user_id)
-    jobs = list(db.scalars(select(InferenceJob)))
-    own_jobs = [job for job in jobs if job.user_id == user_id]
-    if len(jobs) >= settings.inference_max_concurrent or len(own_jobs) >= settings.inference_user_max_concurrent:
-        blocking = own_jobs if len(own_jobs) >= settings.inference_user_max_concurrent else jobs
-        retry_after = max(1, ceil((min(job.expires_at for job in blocking) - now).total_seconds()))
+    total_job_count = db.scalar(select(func.count(InferenceJob.id))) or 0
+    own_jobs = list(db.scalars(select(InferenceJob).where(InferenceJob.user_id == user_id)))
+    if total_job_count >= settings.inference_max_concurrent or len(own_jobs) >= settings.inference_user_max_concurrent:
+        if len(own_jobs) >= settings.inference_user_max_concurrent:
+            earliest_expiry = min(job.expires_at for job in own_jobs)
+        else:
+            earliest_expiry = db.scalar(select(func.min(InferenceJob.expires_at))) or now
+        retry_after = max(1, ceil((earliest_expiry - now).total_seconds()))
         db.commit()
         raise HTTPException(status_code=429, detail={"code": "inference_busy", "message": "Inference capacity is busy. Retry after the current jobs finish.", "retry_after": retry_after}, headers={"Retry-After": str(retry_after)})
     # Backfill sizes only for files with existing server-recorded ownership.
@@ -68,7 +78,11 @@ def reserve_inference_job(db: Session, request: Request, user_id: str, job_id: s
         raise HTTPException(status_code=413, detail={"code": "upload_quota_exceeded", "message": "Your image storage quota is full. Delete unused ledger records before uploading more images."})
     enforce_rate_limit(db, request, "inference-daily", ip_limit=None, account=user_id,
                        account_limit=settings.inference_daily_limit, window_seconds=86400, commit=False)
+    if db.get(User, user_id).is_demo:
+        enforce_rate_limit(db, request, "demo-inference-daily", ip_limit=settings.inference_daily_limit,
+                           window_seconds=86400, commit=False)
     db.add(InferenceJob(id=job_id, user_id=user_id, filename=filename, size_bytes=size_bytes,
+                        storage_provider=provider,
                         expires_at=now + timedelta(seconds=settings.modal_timeout_seconds + 30)))
     db.commit()
 
@@ -81,9 +95,16 @@ def lock_inference_job(db: Session, job_id: str) -> InferenceJob:
     return job
 
 
-def abandon_inference_job(db: Session, job_id: str, filename: str) -> None:
+def abandon_inference_job(db: Session, job_id: str, filename: str, defer_remote: bool = False) -> None:
     db.rollback()
-    _upload_path(filename).unlink(missing_ok=True)
+    job = db.get(InferenceJob, job_id)
+    if db.get(UploadedImage, filename) is None:
+        if job and defer_remote:
+            # An interrupted upload may finish at the provider after the connection closes.
+            job.expires_at = utcnow_naive() + timedelta(seconds=settings.storage_timeout_seconds + 30)
+            db.commit()
+            return
+        delete_stored_image(filename, job.storage_provider if job else "local")
     db.execute(delete(InferenceJob).where(InferenceJob.id == job_id))
     db.commit()
 
@@ -103,12 +124,18 @@ def _cleanup_pending_images(db: Session, user_id: str | None = None) -> None:
     statement = select(UploadedImage).where(UploadedImage.cleanup_pending.is_(True))
     if user_id is not None:
         statement = statement.where(UploadedImage.user_id == user_id)
-    for image in db.scalars(statement):
+    for image in db.scalars(statement.limit(10)):
         referenced = db.scalar(select(CountSession.id).where(
             CountSession.image_path == f"/api/uploads/{image.filename}", CountSession.user_id == image.user_id,
         ).limit(1))
         if referenced is None:
-            _upload_path(image.filename).unlink(missing_ok=True)
+            try:
+                delete_stored_image(image.filename, image.storage_provider)
+            except Exception:
+                logger.warning("Deleted upload cleanup deferred for %s.", image.filename, exc_info=True)
+                if image.storage_provider != "local":
+                    break
+                continue
             db.delete(image)
         else:
             image.cleanup_pending = False
@@ -133,3 +160,4 @@ def _cleanup_previews(db: Session, now, user_id: str | None = None) -> None:
     db.flush()
     for preview in previews:
         mark_unused_session_image(db, preview.user_id, preview.image_path)
+    db.flush()
