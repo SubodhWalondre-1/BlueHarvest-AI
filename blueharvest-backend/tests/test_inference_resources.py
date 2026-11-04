@@ -209,9 +209,40 @@ def test_partial_file_write_failure_cleans_up(client, registered, image_bytes, m
         raise OSError("Simulated disk write failure")
 
     monkeypatch.setattr(Path, "write_bytes", fail)
-    with pytest.raises(OSError, match="disk write failure"):
-        upload(client, registered, image_bytes)
+    response = upload(client, registered, image_bytes)
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "image_storage_unavailable"
     assert_http_cleanup()
+
+
+def test_commit_acknowledgement_failure_does_not_delete_a_persisted_image(client, registered, image_bytes, monkeypatch):
+    from sqlalchemy.orm import Session
+
+    async def count(*_args):
+        return {"final_fish_count": 17, "final_count": 17, "stats": {}}
+
+    monkeypatch.setattr(image_processing, "count_fish_image", count)
+    original = Session.commit
+
+    def fail_after_commit(db):
+        completing = any(isinstance(row, UploadedImage) for row in db.new)
+        original(db)
+        if completing:
+            raise RuntimeError("Simulated lost commit acknowledgement")
+
+    monkeypatch.setattr(Session, "commit", fail_after_commit)
+    with pytest.raises(RuntimeError, match="lost commit acknowledgement"):
+        upload(client, registered, image_bytes)
+    provider = app.dependency_overrides[get_db]()
+    try:
+        db = next(provider)
+        row = db.scalar(select(UploadedImage))
+        assert row is not None
+        assert (settings.uploads_path / row.filename).read_bytes() == image_bytes
+        assert db.scalar(select(CountSession)) is not None
+        assert db.scalar(select(InferenceJob)) is None
+    finally:
+        provider.close()
 
 
 def test_deleting_session_releases_its_owned_image_storage(client, registered, image_bytes, monkeypatch):
@@ -310,6 +341,34 @@ def test_expired_reservation_cannot_commit_a_result(resource_db):
         with pytest.raises(HTTPException) as rejected:
             resources.lock_inference_job(db, job_id)
         assert rejected.value.status_code == 503
+
+
+def test_locked_expired_file_retains_its_reservation_until_cleanup_succeeds(resource_db, monkeypatch):
+    from pathlib import Path
+
+    filename = f"{'d' * 32}.png"
+    path = settings.uploads_path / filename
+    path.write_bytes(b"partial")
+    original = Path.unlink
+
+    def fail(target, *args, **kwargs):
+        if target.name == filename:
+            raise PermissionError("Simulated locked failed upload")
+        return original(target, *args, **kwargs)
+
+    with resource_db() as db:
+        db.add(InferenceJob(id="locked-upload", user_id="resource-user-1", filename=filename, size_bytes=7,
+                            expires_at=utcnow_naive() - timedelta(seconds=1)))
+        db.commit()
+        monkeypatch.setattr(Path, "unlink", fail)
+        resources.cleanup_expired_inference_jobs(db)
+        assert db.get(InferenceJob, "locked-upload") is not None
+        with pytest.raises(HTTPException) as rejected:
+            reserve(db)
+        assert rejected.value.status_code == 429
+        monkeypatch.setattr(Path, "unlink", original)
+        reserve(db)
+        assert db.get(InferenceJob, "locked-upload") is None and not path.exists()
 
 
 @pytest.mark.parametrize("field", ["inference_max_concurrent", "inference_user_max_concurrent", "inference_daily_limit", "upload_user_quota_mb", "inference_preview_ttl_hours", "modal_timeout_seconds"])
