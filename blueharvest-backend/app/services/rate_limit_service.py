@@ -3,6 +3,8 @@ import hashlib
 import hmac
 from ipaddress import IPv6Address, ip_address
 from math import ceil
+import random
+import sys
 
 from fastapi import HTTPException, Request
 from sqlalchemy import case, delete, or_, select
@@ -35,6 +37,7 @@ def _bucket_key(scope: str, identity: str) -> str:
 def enforce_rate_limit(
     db: Session, request: Request, scope: str, *, ip_limit: int | None, window_seconds: int,
     account: str | None = None, account_limit: int | None = None, commit: bool = True,
+    prune_expired: bool | None = None,
 ) -> None:
     """Reserve shared request budgets before performing any business writes."""
     now = utcnow_naive()
@@ -44,7 +47,13 @@ def enforce_rate_limit(
         budgets.append((f"{scope}:account", account, account_limit))
 
     insert = sqlite_insert if db.get_bind().dialect.name == "sqlite" else postgres_insert
-    db.execute(delete(RateLimitBucket).where(RateLimitBucket.expires_at <= now))
+    should_prune = (
+        prune_expired
+        if prune_expired is not None
+        else (settings.app_env.lower() == "test" or "pytest" in sys.modules or random.random() < 0.05)
+    )
+    if should_prune:
+        db.execute(delete(RateLimitBucket).where(RateLimitBucket.expires_at <= now))
     for budget_scope, identity, limit in budgets:
         key = _bucket_key(budget_scope, identity)
         expired = RateLimitBucket.expires_at <= now
