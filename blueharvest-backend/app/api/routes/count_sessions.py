@@ -61,7 +61,7 @@ def list_count_sessions(
         stmt = stmt.where(CountSession.is_saved.is_(True))
     if not include_demo:
         stmt = stmt.where(CountSession.is_demo.is_(False))
-    stmt = stmt.order_by(CountSession.created_at.desc()).limit(limit).offset(offset)
+    stmt = stmt.order_by(CountSession.created_at.desc(), CountSession.id.desc()).limit(limit).offset(offset)
     items = list(db.scalars(stmt))
     return {"items": [_present(item) for item in items], "limit": limit, "offset": offset}
 
