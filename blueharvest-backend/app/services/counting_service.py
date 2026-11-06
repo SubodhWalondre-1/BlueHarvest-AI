@@ -8,6 +8,7 @@ it never synthesizes a count or model metric.
 from __future__ import annotations
 
 import base64
+from contextlib import asynccontextmanager
 import math
 from typing import Any
 from urllib.parse import urljoin
@@ -203,14 +204,36 @@ def _url(path: str) -> str:
     return urljoin(settings.modal_base_url.rstrip("/") + "/", path.lstrip("/"))
 
 
-async def count_fish_image(image_bytes: bytes, filename: str, content_type: str | None = None) -> dict[str, Any]:
+@asynccontextmanager
+async def _get_client(client: httpx.AsyncClient | None = None, timeout: float = 90.0):
+    if client is not None and not getattr(client, "is_closed", False):
+        yield client
+        return
+    try:
+        from app.main import app
+        shared_client = getattr(getattr(app, "state", None), "http_client", None)
+        if shared_client is not None and not getattr(shared_client, "is_closed", False):
+            yield shared_client
+            return
+    except Exception:
+        pass
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as fallback_client:
+        yield fallback_client
+
+
+async def count_fish_image(
+    image_bytes: bytes,
+    filename: str,
+    content_type: str | None = None,
+    client: httpx.AsyncClient | None = None,
+) -> dict[str, Any]:
     headers = _provider_headers()
     safe_content_type = content_type if content_type and content_type.startswith("image/") else "application/octet-stream"
     request_kwargs = _build_predict_request(image_bytes, filename, safe_content_type)
     request_kwargs.setdefault("headers", {}).update(headers)
     try:
-        async with httpx.AsyncClient(timeout=settings.modal_timeout_seconds, follow_redirects=False) as client:
-            response = await client.post(_url(settings.modal_predict_path), **request_kwargs)
+        async with _get_client(client, timeout=settings.modal_timeout_seconds) as http_client:
+            response = await http_client.post(_url(settings.modal_predict_path), **request_kwargs)
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -232,8 +255,8 @@ async def count_fish_image(image_bytes: bytes, filename: str, content_type: str 
         alt_field = "image" if current_field == "file" else "file"
         alt_kwargs = {"files": {alt_field: (filename, image_bytes, safe_content_type)}, "headers": dict(headers)}
         try:
-            async with httpx.AsyncClient(timeout=settings.modal_timeout_seconds, follow_redirects=False) as client:
-                retry_resp = await client.post(_url(settings.modal_predict_path), **alt_kwargs)
+            async with _get_client(client, timeout=settings.modal_timeout_seconds) as retry_client:
+                retry_resp = await retry_client.post(_url(settings.modal_predict_path), **alt_kwargs)
                 if 200 <= retry_resp.status_code < 300:
                     response = retry_resp
         except Exception:
@@ -261,11 +284,11 @@ async def count_fish_image(image_bytes: bytes, filename: str, content_type: str 
     return _extract_response(payload)
 
 
-async def check_modal_health() -> dict[str, Any]:
+async def check_modal_health(client: httpx.AsyncClient | None = None) -> dict[str, Any]:
     headers = _provider_headers()
     try:
-        async with httpx.AsyncClient(timeout=min(settings.modal_timeout_seconds, 15.0), follow_redirects=False) as client:
-            response = await client.get(_url(settings.modal_health_path), headers=headers)
+        async with _get_client(client, timeout=min(settings.modal_timeout_seconds, 15.0)) as http_client:
+            response = await http_client.get(_url(settings.modal_health_path), headers=headers)
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
