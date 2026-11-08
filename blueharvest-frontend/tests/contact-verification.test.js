@@ -42,6 +42,18 @@ test('confirmation sends the challenge ID, OTP, and unmodified current password'
   assert.deepEqual([...storage.keys()], ['bh_access_token']);
 });
 
+test('validation errors show readable messages without echoing submitted values', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ detail: [
+    { loc: ['body', 'value'], msg: 'Enter a valid email address.', input: 'private-submitted-value' },
+  ] }, { status: 422 }));
+  await assert.rejects(requestContactChange({ channel: 'email', value: 'invalid', password }), (error) => {
+    assert.equal(error.message, 'Enter a valid email address.');
+    assert.equal(error.code, 'validation_error');
+    assert.equal(error.message.includes('private-submitted-value'), false);
+    return error.status === 422;
+  });
+});
+
 for (const status of [400, 403, 409, 429, 503]) {
   test(`contact verification error ${status} is surfaced without a direct profile update`, async (t) => {
     let calls = 0;

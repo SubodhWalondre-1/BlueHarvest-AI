@@ -5,6 +5,8 @@
  * HttpOnly cookie issued by FastAPI.
  */
 
+import { compressImageIfNeeded } from '../utils/imageCompressor.js';
+
 const ACCESS_TOKEN_KEY = 'bh_access_token';
 const CSRF_HEADERS = { 'X-CSRF-Protection': '1' };
 let accessToken = null;
@@ -89,7 +91,10 @@ async function parseError(response, fallback) {
   try {
     const body = await response.json();
     const detail = body?.detail;
-    if (detail && typeof detail === 'object') {
+    if (Array.isArray(detail)) {
+      message = detail.map((item) => item.msg || 'Please check the values you entered.').join(' ');
+      code = 'validation_error';
+    } else if (detail && typeof detail === 'object') {
       message = detail.message || JSON.stringify(detail);
       code = detail.code || null;
     } else if (typeof detail === 'string') {
@@ -282,9 +287,16 @@ export async function updateUserSettings(payload) {
 }
 
 export async function listCountSessions({ includeDemo = false, includeUnsaved = false } = {}) {
-  const params = new URLSearchParams({ include_demo: String(includeDemo), include_unsaved: String(includeUnsaved) });
-  const data = await apiRequest(`/api/count-sessions?${params.toString()}`);
-  return data.items || [];
+  const items = [];
+  let offset = 0;
+  while (true) {
+    const params = new URLSearchParams({ include_demo: String(includeDemo), include_unsaved: String(includeUnsaved), limit: '500', offset: String(offset) });
+    const data = await apiRequest(`/api/count-sessions?${params.toString()}`);
+    const page = data.items || [];
+    items.push(...page);
+    if (page.length < (data.limit || 500)) return items;
+    offset += page.length;
+  }
 }
 
 export async function saveCountSession(sessionId) {
@@ -320,15 +332,17 @@ export async function getDemoStatus() {
 }
 
 export async function processImage(imageFile, source = 'Uploaded') {
+  const readyFile = await compressImageIfNeeded(imageFile);
   const formData = new FormData();
-  formData.append('image', imageFile);
+  formData.append('image', readyFile);
   formData.append('source', source);
   return apiRequest('/api/image-processing', { method: 'POST', body: formData });
 }
 
 export async function preprocessImage(imageFile) {
+  const readyFile = await compressImageIfNeeded(imageFile);
   const formData = new FormData();
-  formData.append('file', imageFile);
+  formData.append('file', readyFile);
   return apiRequest('/api/preprocess-image', { method: 'POST', body: formData });
 }
 
