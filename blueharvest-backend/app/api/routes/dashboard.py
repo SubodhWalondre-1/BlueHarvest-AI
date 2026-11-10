@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.config import settings
@@ -38,23 +38,40 @@ def dashboard_summary(
     if include_demo and not settings.demo_mode_enabled:
         raise HTTPException(status_code=403, detail={"code": "demo_mode_disabled", "message": "Demo data mode is disabled."})
     start = _range_start(range)
-    stmt = select(CountSession).where(CountSession.user_id == user.id, CountSession.is_saved.is_(True))
-    stmt = stmt.where(or_(CountSession.inference_verified.is_(True), CountSession.is_demo.is_(True)))
+    filters = [
+        CountSession.user_id == user.id,
+        CountSession.is_saved.is_(True),
+        or_(CountSession.inference_verified.is_(True), CountSession.is_demo.is_(True)),
+    ]
     if start:
-        stmt = stmt.where(CountSession.created_at >= start)
+        filters.append(CountSession.created_at >= start)
     if not include_demo:
-        stmt = stmt.where(CountSession.is_demo.is_(False))
-    sessions = list(db.scalars(stmt))
-    total_fish = sum(item.count or 0 for item in sessions)
+        filters.append(CountSession.is_demo.is_(False))
+
+    summary_stmt = select(
+        func.coalesce(func.sum(CountSession.count), 0),
+        func.count(CountSession.id),
+    ).where(*filters)
+    total_fish, total_sessions = db.execute(summary_stmt).one()
+
+    location_stmt = (
+        select(
+            CountSession.pond_location,
+            func.coalesce(func.sum(CountSession.count), 0),
+        )
+        .where(*filters)
+        .group_by(CountSession.pond_location)
+    )
     location_totals: dict[str, int] = {}
-    for item in sessions:
-        label = item.pond_location or "Unspecified location"
-        location_totals[label] = location_totals.get(label, 0) + (item.count or 0)
+    for loc, count in db.execute(location_stmt):
+        label = loc or "Unspecified location"
+        location_totals[label] = location_totals.get(label, 0) + int(count or 0)
     locations = [{"name": name, "count": count} for name, count in sorted(location_totals.items(), key=lambda pair: pair[1], reverse=True)]
+
     return {
         "range": range,
-        "total_fish": total_fish,
-        "sessions": len(sessions),
+        "total_fish": int(total_fish or 0),
+        "sessions": int(total_sessions or 0),
         "locations": locations,
         "includes_demo_data": include_demo,
         "demo_label": "DEMO DATA — SAMPLE ONLY" if include_demo else None,

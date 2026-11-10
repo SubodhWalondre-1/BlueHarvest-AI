@@ -9,7 +9,16 @@ if settings.normalized_database_url.startswith("sqlite:///") and ":memory:" not 
     if db_path and db_path != ":memory:":
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-engine = create_engine(settings.normalized_database_url, connect_args=connect_args, pool_pre_ping=True)
+pool_kwargs = {}
+if not settings.normalized_database_url.startswith("sqlite"):
+    pool_kwargs = {
+        "pool_size": 20,
+        "max_overflow": 30,
+        "pool_recycle": 1800,
+        "pool_timeout": 30,
+    }
+
+engine = create_engine(settings.normalized_database_url, connect_args=connect_args, pool_pre_ping=True, **pool_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
