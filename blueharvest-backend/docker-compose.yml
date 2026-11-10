@@ -8,6 +8,12 @@ services:
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in the project .env before running Docker Compose}
       DATABASE_URL: sqlite:////data/blueharvest.db
       UPLOAD_DIR: /data/uploads
+      UPLOAD_STORAGE_PERSISTENT: "true"
+      STORAGE_TIMEOUT_SECONDS: ${STORAGE_TIMEOUT_SECONDS:-20}
+      CLOUDINARY_URL: ${CLOUDINARY_URL:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
