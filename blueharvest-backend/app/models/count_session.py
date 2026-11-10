@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, false
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.core.time import utcnow_naive
@@ -7,6 +7,9 @@ from app.core.time import utcnow_naive
 
 class CountSession(Base):
     __tablename__ = "count_sessions"
+    __table_args__ = (
+        Index("ix_count_sessions_user_saved_created", "user_id", "is_saved", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     batch_code: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
