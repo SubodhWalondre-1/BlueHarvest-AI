@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { loginUser, loginWithGoogleCredential } from '../api/client';
+import { getDiagnostics, loginUser, loginWithGoogleCredential } from '../api/client';
 
 const loadGoogleIdentityScript = () => new Promise((resolve, reject) => {
   if (window.google?.accounts?.id) return resolve();
@@ -31,6 +31,12 @@ export default function LoginView({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [authError, setAuthError] = useState('');
+  const [demoAvailable, setDemoAvailable] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getDiagnostics().then((data) => { if (active) setDemoAvailable(Boolean(data.demo_mode?.enabled)); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -155,7 +161,7 @@ export default function LoginView({
 
       <div className="login-content-container">
         {/* Temporary Demo Credentials Tab in Top Right */}
-        <button
+        {demoAvailable && <button
           type="button"
           className={`demo-credentials-tab ${isDemoFilled ? 'filled' : ''}`}
           onClick={handleFillDemo}
@@ -164,7 +170,7 @@ export default function LoginView({
         >
           <span className="demo-tab-icon">{isDemoFilled ? '✓' : '⚡'}</span>
           <span className="demo-tab-text">{isDemoFilled ? 'Filled!' : 'Demo'}</span>
-        </button>
+        </button>}
 
         {/* Blue Harvest Logo Badge */}
         <div className="app-logo-badge" aria-label="Blue Harvest Logo">

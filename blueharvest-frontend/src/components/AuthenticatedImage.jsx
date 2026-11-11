@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchUploadedImage, getPrivateImagePath } from '../api/client';
 
-export default function AuthenticatedImage({ src, fallbackSrc, alt, ...props }) {
+export default function AuthenticatedImage({ src, fallbackSrc, alt, onError, ...props }) {
   const privatePath = getPrivateImagePath(src);
   const [resolved, setResolved] = useState({ source: null, url: null });
 
@@ -32,5 +32,10 @@ export default function AuthenticatedImage({ src, fallbackSrc, alt, ...props }) 
     ? (resolved.source === src ? resolved.url : fallbackSrc)
     : (src || fallbackSrc);
 
-  return <img {...props} src={imageSource || undefined} alt={alt} />;
+  return <img {...props} src={imageSource || undefined} alt={alt} onError={(event) => {
+    onError?.(event);
+    if (fallbackSrc && event.currentTarget.src !== new URL(fallbackSrc, window.location.href).href) {
+      event.currentTarget.src = fallbackSrc;
+    }
+  }} />;
 }
