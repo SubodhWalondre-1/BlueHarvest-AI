@@ -63,6 +63,30 @@ test('ledger requests exclude unsaved inference previews by default', async (t) 
   assert.deepEqual(await listCountSessions(), [{ session_id: sessionId }]);
 });
 
+test('history fetches every page instead of stopping at the latest 100 records', async (t) => {
+  const rows = Array.from({ length: 501 }, (_, index) => ({ session_id: `session-${index}` }));
+  const offsets = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const params = new URL(url).searchParams;
+    const offset = Number(params.get('offset'));
+    offsets.push(offset);
+    assert.equal(params.get('include_demo'), 'true');
+    return Response.json({ items: rows.slice(offset, offset + 500), limit: 500, offset });
+  });
+  assert.deepEqual(await listCountSessions({ includeDemo: true }), rows);
+  assert.deepEqual(offsets, [0, 500]);
+});
+
+test('history surfaces a later page error instead of presenting an incomplete ledger', async (t) => {
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (new URL(url).searchParams.get('offset') === '0') {
+      return Response.json({ items: Array.from({ length: 500 }, () => ({})), limit: 500 });
+    }
+    return Response.json({ detail: 'Could not load the remaining history.' }, { status: 503 });
+  });
+  await assert.rejects(listCountSessions(), /remaining history/);
+});
+
 for (const status of [404, 409, 429]) {
   test(`save failure ${status} is surfaced without submitting replacement metrics`, async (t) => {
     let calls = 0;

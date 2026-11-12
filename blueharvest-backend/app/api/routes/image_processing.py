@@ -5,7 +5,8 @@ from typing import Annotated, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
@@ -13,17 +14,18 @@ from app.core.config import settings
 from app.core.time import utcnow_naive
 from app.db.session import get_db
 from app.models import CountSession, UploadedImage, User
+from app.schemas.count import InferenceResultResponse
 from app.services.image_validation import read_and_validate_image
 from app.services.counting_service import check_modal_health, count_fish_image
 from app.services.rate_limit_service import enforce_rate_limit
 from app.services.inference_resource_service import abandon_inference_job, lock_inference_job, reserve_inference_job
-from app.services.storage_service import upload_image_to_storage
+from app.services.storage_service import download_stored_image, storage_error, storage_provider, upload_image_to_storage
 
 router = APIRouter(prefix="/api", tags=["image processing"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/image-processing")
+@router.post("/image-processing", response_model=InferenceResultResponse)
 async def image_processing(
     request: Request, image: UploadFile = File(...), _user: User = Depends(get_current_user),
     db: Session = Depends(get_db), source: Annotated[Literal["Uploaded", "Camera"], Form()] = "Uploaded",
@@ -38,19 +40,22 @@ async def image_processing(
     if image_ext == "jpeg":
         image_ext = "jpg"
     unique_filename = f"{uuid4().hex}.{image_ext}"
-    dest_path = settings.uploads_path / unique_filename
     image_url = f"/api/uploads/{unique_filename}"
     job_id = str(uuid4())
-    reserve_inference_job(db, request, _user.id, job_id, unique_filename, len(data))
+    provider = storage_provider()
+    await run_in_threadpool(reserve_inference_job, db, request, _user.id, job_id, unique_filename, len(data), provider)
+    storage_completed = False
     try:
-        image_url = upload_image_to_storage(data, unique_filename)
         async with asyncio.timeout(settings.modal_timeout_seconds):
+            asset_id = await upload_image_to_storage(data, unique_filename, provider)
+            storage_completed = True
             result = await count_fish_image(data, image_info["filename"], image.content_type)
         job = lock_inference_job(db, job_id)
         db.add(UploadedImage(
             filename=unique_filename, user_id=_user.id,
             media_type="image/jpeg" if image_ext == "jpg" else f"image/{image_ext}",
             size_bytes=len(data),
+            storage_provider=provider, storage_asset_id=asset_id,
         ))
         stats = result.get("stats", {})
         now = utcnow_naive()
@@ -68,7 +73,7 @@ async def image_processing(
     except BaseException as exc:
         # Remove incomplete uploads even when inference is cancelled.
         try:
-            abandon_inference_job(db, job_id, unique_filename)
+            await run_in_threadpool(abandon_inference_job, db, job_id, unique_filename, provider == "cloudinary" and not storage_completed)
         except Exception:
             logger.exception("Incomplete inference cleanup will be retried after its reservation expires.")
         if isinstance(exc, TimeoutError):
@@ -82,19 +87,25 @@ async def image_processing(
 
 
 @router.get("/uploads/{filename}")
-async def get_uploaded_image(filename: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_uploaded_image(filename: str, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not re.fullmatch(r"[a-f0-9]{32}\.(jpg|png|webp|bmp|tiff)", filename):
         raise HTTPException(status_code=404, detail={"code": "image_not_found", "message": "Uploaded image not found."})
     image = db.scalar(select(UploadedImage).where(UploadedImage.filename == filename, UploadedImage.user_id == user.id))
     if image is None:
         raise HTTPException(status_code=404, detail={"code": "image_not_found", "message": "Uploaded image not found."})
+    headers = {"Cache-Control": "private, no-store", "Vary": "Authorization", "X-Content-Type-Options": "nosniff"}
+    if image.storage_provider != "local":
+        if image.storage_provider != "cloudinary" or not image.storage_asset_id:
+            raise storage_error()
+        data, status_code, range_headers = await download_stored_image(
+            image.storage_asset_id, max(image.size_bytes, settings.max_upload_mb * 1024 * 1024), request.headers.get("range"),
+        )
+        return Response(data, status_code=status_code, media_type=image.media_type, headers={**headers, **range_headers})
     base_path = settings.uploads_path.resolve()
     file_path = base_path / filename
     if file_path.is_symlink() or file_path.resolve().parent != base_path or not file_path.is_file():
         raise HTTPException(status_code=404, detail={"code": "image_not_found", "message": "Uploaded image not found."})
-    return FileResponse(file_path, media_type=image.media_type, headers={
-        "Cache-Control": "private, no-store", "Vary": "Authorization", "X-Content-Type-Options": "nosniff",
-    })
+    return FileResponse(file_path, media_type=image.media_type, headers=headers)
 
 
 @router.post("/preprocess-image")
