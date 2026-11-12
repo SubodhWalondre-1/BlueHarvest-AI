@@ -11,6 +11,37 @@ from app.services.inference_resource_service import cleanup_expired_inference_jo
 from app.services.storage_service import secure_legacy_images
 from starlette.concurrency import run_in_threadpool
 
+if settings.sentry_dsn and settings.app_env.lower() != "test":
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+        def _scrub_sentry_event(event, hint):
+            request = event.get("request", {})
+            headers = request.get("headers", {})
+            for key in list(headers.keys()):
+                if key.lower() in {"authorization", "cookie", "set-cookie", "x-csrf-token"}:
+                    headers[key] = "[REDACTED]"
+            data = request.get("data")
+            if isinstance(data, dict):
+                for k in ["password", "token", "file", "credential", "otp"]:
+                    if k in data:
+                        data[k] = "[REDACTED]"
+            return event
+
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+            traces_sample_rate=0.2,
+            send_default_pii=False,
+            before_send=_scrub_sentry_event,
+            environment=settings.app_env,
+        )
+    except Exception:
+        pass
+
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):

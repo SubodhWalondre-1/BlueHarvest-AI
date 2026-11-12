@@ -110,6 +110,8 @@ def abandon_inference_job(db: Session, job_id: str, filename: str, defer_remote:
 
 
 def mark_unused_session_image(db: Session, user_id: str, image_path: str | None) -> None:
+    if settings.retain_all_uploads:
+        return
     if not image_path or not image_path.startswith("/api/uploads/"):
         return
     filename = image_path.removeprefix("/api/uploads/")
@@ -121,6 +123,8 @@ def mark_unused_session_image(db: Session, user_id: str, image_path: str | None)
 
 
 def _cleanup_pending_images(db: Session, user_id: str | None = None) -> None:
+    if settings.retain_all_uploads:
+        return
     statement = select(UploadedImage).where(UploadedImage.cleanup_pending.is_(True))
     if user_id is not None:
         statement = statement.where(UploadedImage.user_id == user_id)
@@ -148,6 +152,8 @@ def cleanup_pending_images(db: Session, user_id: str) -> None:
 
 
 def _cleanup_previews(db: Session, now, user_id: str | None = None) -> None:
+    if settings.retain_all_uploads:
+        return
     statement = select(CountSession).where(
         CountSession.is_saved.is_(False), CountSession.inference_verified.is_(True),
         CountSession.created_at <= now - timedelta(hours=settings.inference_preview_ttl_hours),

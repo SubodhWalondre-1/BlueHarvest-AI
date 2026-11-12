@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     storage_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
     max_upload_mb: int = 12
     google_client_id: str | None = None
+    google_client_secret: str | None = None
+    sentry_dsn: str | None = None
+    retain_all_uploads: bool = False
     demo_mode_enabled: bool = False
     dev_expose_otp: bool = False
     otp_ttl_minutes: int = 10
