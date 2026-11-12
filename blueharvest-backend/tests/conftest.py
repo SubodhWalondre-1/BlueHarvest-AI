@@ -32,6 +32,9 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "app_env", "test")
     monkeypatch.setattr(settings, "dev_expose_otp", True)
     monkeypatch.setattr(settings, "modal_enabled", False)
+    monkeypatch.setattr(settings, "demo_mode_enabled", False)
+    for key in ("cloudinary_url", "cloudinary_cloud_name", "cloudinary_api_key", "cloudinary_api_secret"):
+        monkeypatch.setattr(settings, key, None)
     monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
     with TestClient(app) as test_client:
         yield test_client

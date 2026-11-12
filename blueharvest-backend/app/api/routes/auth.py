@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models import AuthSession, PasswordResetChallenge, User, UserSettings
 from app.schemas.auth import GoogleLoginRequest, LoginRequest, PasswordResetConfirm, PasswordResetRequest, PasswordResetVerify, SignupRequest
 from app.services.auth_service import authenticate_user, create_user, issue_session, public_user
+from app.services.demo_service import DEMO_USER, create_demo_workspace
 from app.services.email_service import DeliveryNotConfigured, send_email_otp
 from app.services.sms_service import send_sms_otp
 from app.services.google_auth_service import GoogleCredentialError, verify_google_credential
@@ -57,6 +58,8 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
     )
     user = authenticate_user(db, body.username, body.password)
     clear_account_limit(db, "login", account)
+    if user.username == DEMO_USER["username"] and user.email == DEMO_USER["email"]:
+        user = create_demo_workspace(db)
     return issue_session(db, user, response)
 
 

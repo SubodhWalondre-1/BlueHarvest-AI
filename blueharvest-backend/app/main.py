@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -7,6 +8,8 @@ from app.api.deps import CSRF_HEADER
 from app.db.session import SessionLocal
 from app.services.demo_service import seed_demo_data
 from app.services.inference_resource_service import cleanup_expired_inference_jobs
+from app.services.storage_service import secure_legacy_images
+from starlette.concurrency import run_in_threadpool
 
 
 @asynccontextmanager
@@ -14,17 +17,29 @@ async def lifespan(_app: FastAPI):
     # Schema changes are managed exclusively through Alembic migrations.
     # Do not call create_all() here: it can create tables before the Alembic
     # version table exists and make a later `alembic upgrade head` fail.
-    settings.uploads_path.mkdir(parents=True, exist_ok=True)
-    if settings.app_env.lower() != "test":
-        with SessionLocal() as db:
-            cleanup_expired_inference_jobs(db)
-    if settings.demo_mode_enabled:
-        db = SessionLocal()
-        try:
-            seed_demo_data(db)
-        finally:
-            db.close()
-    yield
+    _app.state.http_client = httpx.AsyncClient(
+        timeout=settings.modal_timeout_seconds,
+        limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+        follow_redirects=False,
+    )
+    try:
+        if not settings.cloudinary_is_configured:
+            settings.uploads_path.mkdir(parents=True, exist_ok=True)
+        if settings.app_env.lower() != "test":
+            with SessionLocal() as db:
+                await secure_legacy_images(db)
+                await run_in_threadpool(cleanup_expired_inference_jobs, db)
+        if settings.demo_mode_enabled:
+            db = SessionLocal()
+            try:
+                seed_demo_data(db)
+            finally:
+                db.close()
+        yield
+    finally:
+        await _app.state.http_client.aclose()
+        if hasattr(_app.state, "http_client"):
+            delattr(_app.state, "http_client")
 
 
 app = FastAPI(

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     database_url: str = "sqlite:///./data/blueharvest.db"
     upload_dir: str = "./data/uploads"
+    upload_storage_persistent: bool = False
+    storage_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
     max_upload_mb: int = 12
     google_client_id: str | None = None
     demo_mode_enabled: bool = False
@@ -51,9 +53,8 @@ class Settings(BaseSettings):
     twilio_auth_token: str | None = None
     twilio_from_number: str | None = None
 
-    # Modal-hosted BlueHarvest P2PNet inference. Secrets are read from backend/.env
-    # only; never hard-code Modal-Key or Modal-Secret in source code.
-    modal_enabled: bool = False
+    # Modal-hosted BlueHarvest P2PNet inference.
+    modal_enabled: bool = True
     modal_base_url: str = "https://subodhwalondre87--blueharvest-p2pnet-p2pnetservice-web.modal.run"
     modal_key: str | None = None
     modal_secret: str | None = None
@@ -65,7 +66,7 @@ class Settings(BaseSettings):
     modal_count_field: str | None = "count"  # Optional dotted path, e.g. count or data.count
     modal_points_field: str | None = None  # Optional dotted path to an explicit list of point predictions
 
-    # Cloudinary permanent image storage (optional; falls back to local storage if unset)
+    # Production local storage requires an explicitly configured persistent disk.
     cloudinary_cloud_name: str | None = None
     cloudinary_api_key: str | None = None
     cloudinary_api_secret: str | None = None

@@ -1,17 +1,17 @@
-from pathlib import Path
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models import CountSession, User
+from app.services.storage_service import storage_provider
 
 router = APIRouter(prefix="/api", tags=["diagnostics"])
 
 
 @router.get("/diagnostics")
-def diagnostics(db: Session = Depends(get_db)):
+def diagnostics(response: Response, db: Session = Depends(get_db)):
     database_ok = False
     try:
         db.execute(text("SELECT 1"))
@@ -25,7 +25,13 @@ def diagnostics(db: Session = Depends(get_db)):
     except OSError:
         upload_writable = False
     modal_configured = settings.modal_is_configured
-    all_core_ok = database_ok and upload_writable
+    try:
+        provider = storage_provider()
+        storage_ready = provider == "cloudinary" or upload_writable
+    except HTTPException:
+        provider, storage_ready = "unconfigured", False
+    all_core_ok = database_ok and storage_ready
+    response.status_code = 200 if all_core_ok else 503
     return {
         "status": "ok" if all_core_ok else "degraded",
         "service": settings.app_name,
@@ -45,10 +51,11 @@ def diagnostics(db: Session = Depends(get_db)):
             "message": "Modal credentials are configured; use GET /api/model/health to check live reachability." if modal_configured else "Set MODAL_ENABLED, MODAL_KEY, and MODAL_SECRET to enable the real P2PNet inference service.",
         },
         "storage": {
-            "status": "ok" if (upload_writable or settings.cloudinary_is_configured) else "error",
-            "provider": "cloudinary" if settings.cloudinary_is_configured else "local_disk",
+            "status": "configured" if provider == "cloudinary" else "ok" if storage_ready else "error",
+            "provider": "local_disk" if provider == "local" else provider,
             "cloudinary_configured": settings.cloudinary_is_configured,
             "upload_directory_ready": upload_writable,
+            "durable_storage_required": settings.app_env.lower() in {"production", "prod"},
         },
         "providers": {
             "google_oauth_configured": bool(settings.google_client_id),
