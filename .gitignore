@@ -86,10 +86,17 @@ docs/SECURITY.md
 docs/TESTING_STRATEGY.md
 docs/TROUBLESHOOTING.md
 docs/trusted-inference-results.md
+docs/private-storage-and-pipeline-fixes.md
+docs/profile-and-resource-controls.md
 
 # Standalone manual counting and utility tools
 fish_remover.html
 manual_counting.html
+
+# Audit reports
+code_audit_report.md
+PRODUCTION_AUDIT_REPORT.md
+
 
 
 
