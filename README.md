@@ -76,7 +76,7 @@ The model runs outside this repository. The backend forwards HTTP requests; it d
 | Frontend | React, JavaScript, Vite, Lucide React, plain CSS |
 | Backend | FastAPI, Pydantic, SQLAlchemy, Alembic |
 | Authentication | Argon2 password hashes, JWT access tokens, opaque refresh tokens |
-| Image handling | Pillow validation, local upload storage, HTTPX inference requests |
+| Image handling | Pillow validation, authenticated local/Cloudinary storage, HTTPX inference requests |
 | Optional providers | Google Identity Services, SMTP email, Twilio SMS, Modal inference |
 | Quality tools | Pytest and Oxlint |
 | Deployment files | Docker Compose, Render, Netlify, and a Vercel frontend rewrite |
@@ -100,14 +100,14 @@ Run from the repository root using two terminals.
 **Terminal 1 - Windows PowerShell**
 
 ```powershell
-cd backend
+cd blueharvest-backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-The copy command preserves an existing `.env`. Generate a signing secret, then paste it into `SECRET_KEY` in `backend/.env`:
+The copy command preserves an existing `.env`. Generate a signing secret, then paste it into `SECRET_KEY` in `blueharvest-backend/.env`:
 
 ```powershell
 python -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -167,14 +167,14 @@ Keep the same browser hostname throughout a local session; use `localhost` consi
 Run the backend in one terminal:
 
 ```bash
-cd backend
+cd blueharvest-backend
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 test -f .env || cp .env.example .env
 ```
 
-Configure `backend/.env` as above, then run:
+Configure `blueharvest-backend/.env` as above, then run:
 
 ```bash
 python -m alembic upgrade head
@@ -202,13 +202,13 @@ Set `APP_ENV=development` and `DEMO_MODE_ENABLED=true`, then restart the backend
 | Email | `demo@blueharvest.local` |
 | Password | `SpawnCounter2026!` |
 
-Fixture rows are marked as demo data in the database and have API status `Demo sample`. Requests exclude them unless `include_demo=true`. The frontend includes them when demo status is enabled for the signed-in account. They are illustrative, not model predictions or evidence of accuracy.
+Each demo login creates an isolated workspace with its own records, uploads, and session. Refreshing a session preserves that workspace; signing in again creates a new one. Fixture rows have API status `Demo sample`, and dashboards and exports visibly identify sample data. They are illustrative, not model predictions or evidence of accuracy. Use a personal account for lasting hatchery records and contact verification.
 
 The supplied `.env.example` enables demo mode and development OTP exposure. Override those values for the clean configuration above. Demo mode does not enable inference.
 
 ## Model integration
 
-Configure the real provider in `backend/.env`:
+Configure the real provider in `blueharvest-backend/.env`:
 
 ```dotenv
 MODAL_ENABLED=true
@@ -246,6 +246,8 @@ These are application defaults unless stated otherwise. A private `.env` or host
 | `SECRET_KEY` | Replace the development fallback with a unique random secret. Production rejects short or recognized placeholder values. |
 | `DATABASE_URL` | `sqlite:///./data/blueharvest.db`; PostgreSQL URLs are also supported. |
 | `UPLOAD_DIR` | `./data/uploads`; relative paths resolve from the backend working directory. |
+| `UPLOAD_STORAGE_PERSISTENT` | `false`; set `true` only for a production directory mounted on persistent storage. |
+| `CLOUDINARY_URL` / `CLOUDINARY_*` | Private durable image storage; required on Render Free. See the storage upgrade guide. |
 | `MAX_UPLOAD_MB` | `12`. |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173`; add the exact deployed frontend origin. |
 | `ACCESS_TOKEN_MINUTES` / `REFRESH_TOKEN_DAYS` | `15` minutes / `14` days. |
@@ -258,7 +260,7 @@ These are application defaults unless stated otherwise. A private `.env` or host
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | SMS recovery for a registered phone number. |
 | `VITE_API_URL` | Frontend backend address. Set explicitly for deployment. |
 
-See [backend/.env.example](backend/.env.example) and [blueharvest-frontend/.env.example](blueharvest-frontend/.env.example) for example settings. Google sign-in also requires the frontend origin to be authorized in the Google OAuth configuration.
+See [blueharvest-backend/.env.example](blueharvest-backend/.env.example) and [blueharvest-frontend/.env.example](blueharvest-frontend/.env.example) for example settings. Google sign-in also requires the frontend origin to be authorized in the Google OAuth configuration.
 
 ## API reference
 
@@ -287,10 +289,10 @@ Authenticated endpoints require `Authorization: Bearer <access_token>`. Refresh 
 | `POST` | `/api/preprocess-image` | Bearer | Validate multipart field `file`. |
 | `GET` | `/api/model/health` | Bearer | Probe Modal health. |
 | `GET` | `/api/uploads/{filename}` | Public | Retrieve an upload. |
-| `POST` | `/api/count-sessions` | Bearer | Create a user-owned record. |
+| `POST` | `/api/count-sessions` | Bearer | Save a backend inference result using its session ID. |
 | `GET` | `/api/count-sessions` | Bearer | List records with pagination and saved/demo flags. |
 | `GET` | `/api/count-sessions/{session_id}` | Bearer | Read using internal ID or batch code. |
-| `PATCH` | `/api/count-sessions/{session_id}/save` | Bearer | Update the saved flag or status. |
+| `PATCH` | `/api/count-sessions/{session_id}/save` | Bearer | Update the saved flag for a verified inference result. |
 | `DELETE` | `/api/count-sessions/{session_id}` | Bearer | Delete a record. |
 | `GET` | `/api/dashboard/summary` | Bearer | Summarize saved records by range and location. |
 | `GET` | `/api/notifications` | Bearer | List user notifications. |
@@ -300,7 +302,7 @@ Authenticated endpoints require `Authorization: Bearer <access_token>`. Refresh 
 
 </details>
 
-Dashboard ranges are `7_days`, `30_days`, `this_month`, and `all_time`. Listing accepts `limit` (default 100, maximum 500), `offset`, `include_unsaved`, and `include_demo`. The frontend loads the first page; older records require API pagination.
+Dashboard ranges include `today`, `this_week`, `this_month`, `7_days`, `30_days`, and `all_time`. Listing accepts `limit` (default 100, maximum 500), `offset`, `include_unsaved`, and `include_demo`. The frontend fetches all pages of saved history.
 
 CSV export runs in the frontend. There is no backend `/api/count-sessions/export` endpoint or JSON export workflow.
 
@@ -308,20 +310,20 @@ CSV export runs in the frontend. There is no backend `/api/count-sessions/export
 
 | Location | Responsibility |
 | :--- | :--- |
-| [backend/app/main.py](backend/app/main.py) | Startup, CORS, and route registration. |
-| [backend/app/api/routes/](backend/app/api/routes/) | Auth, profiles, counting, ledger, summaries, notifications, and diagnostics. |
-| [backend/app/core/](backend/app/core/) | Settings, security helpers, and UTC timestamps. |
-| [backend/app/models/](backend/app/models/) / [schemas/](backend/app/schemas/) | Database entities and request validation. |
-| [backend/app/services/](backend/app/services/) | Provider adapters, validation, account helpers, and demo fixtures. |
-| [backend/alembic/](backend/alembic/) | Database migrations. |
-| [backend/tests/](backend/tests/) | Backend tests and mocked inference. |
+| [blueharvest-backend/app/main.py](blueharvest-backend/app/main.py) | Startup, CORS, and route registration. |
+| [blueharvest-backend/app/api/routes/](blueharvest-backend/app/api/routes/) | Auth, profiles, counting, ledger, summaries, notifications, and diagnostics. |
+| [blueharvest-backend/app/core/](blueharvest-backend/app/core/) | Settings, security helpers, and UTC timestamps. |
+| [blueharvest-backend/app/models/](blueharvest-backend/app/models/) / [schemas/](blueharvest-backend/app/schemas/) | Database entities and request validation. |
+| [blueharvest-backend/app/services/](blueharvest-backend/app/services/) | Provider adapters, validation, account helpers, and demo fixtures. |
+| [blueharvest-backend/alembic/](blueharvest-backend/alembic/) | Database migrations. |
+| [blueharvest-backend/tests/](blueharvest-backend/tests/) | Backend tests and mocked inference. |
 | [blueharvest-frontend/src/App.jsx](blueharvest-frontend/src/App.jsx) | Browser-path routing, session restoration, and theme setup. |
 | [blueharvest-frontend/src/components/](blueharvest-frontend/src/components/) | Login, signup, recovery, camera, ledger, insights, and profile UI. |
 | [blueharvest-frontend/src/api/client.js](blueharvest-frontend/src/api/client.js) | Fetch-based API client and token refresh. |
 | [blueharvest-frontend/src/utils/theme.js](blueharvest-frontend/src/utils/theme.js) | Light, dark, and system themes. |
 | [docs/assets/](docs/assets/) | README artwork. |
 
-Local databases and uploads default to `backend/data/` and are excluded by the backend ignore rules. Frontend routes use the browser History API, so static hosting needs a fallback to `index.html`.
+Local databases and uploads default to `blueharvest-backend/data/` and are excluded by the backend ignore rules. Frontend routes use the browser History API, so static hosting needs a fallback to `index.html`.
 
 ## Development checks
 
@@ -330,7 +332,7 @@ Local databases and uploads default to `backend/data/` and are excluded by the b
 Use a separate terminal so test-specific environment overrides do not carry into the development server:
 
 ```powershell
-cd backend
+cd blueharvest-backend
 .\.venv\Scripts\Activate.ps1
 $env:APP_ENV = "test"
 $env:DATABASE_URL = "sqlite://"
@@ -360,17 +362,17 @@ There is no frontend browser-test suite or model evaluation dataset in this repo
 The backend container uses Python 3.12, runs migrations before Uvicorn, and stores SQLite/uploads in a named `/data` volume.
 
 ```powershell
-cd backend
+cd blueharvest-backend
 docker compose up --build -d
 ```
 
-Set a generated `SECRET_KEY` in `backend/.env`, configure the frontend origin, and disable demo mode first. Compose uses production mode and disables development OTP exposure. Run the frontend separately. Keep SQLite deployments to a single API instance.
+Set a generated `SECRET_KEY` in `blueharvest-backend/.env`, configure the frontend origin, and disable demo mode first. Compose uses production mode and disables development OTP exposure. Run the frontend separately. Keep SQLite deployments to a single API instance.
 
 ### Render backend
 
 [render.yaml](render.yaml) defines a Python web service and linked PostgreSQL database. Import it as a Render Blueprint, then configure private Modal credentials, exact model field mappings, and the frontend origin. Startup runs Alembic and binds Uvicorn to `$PORT`.
 
-The Blueprint uses free plans and `/tmp/uploads`. According to [Render documentation](https://render.com/docs/free), checked on **21 October 2026**:
+The Blueprint uses free plans and `/tmp/uploads`. Configure private Cloudinary storage before enabling uploads; production does not fall back to this ephemeral directory. See the [storage upgrade guide](docs/private-storage-and-pipeline-fixes.md). According to [Render documentation](https://render.com/docs/free), checked on **22 October 2026**:
 
 - Free web-service files are ephemeral: uploads do not survive restarts or redeploys. PostgreSQL records do not make image files persistent.
 - Free PostgreSQL databases expire after 30 days. This configuration suits temporary demos rather than durable hatchery records.
@@ -394,15 +396,15 @@ Allow the exact frontend origin in the backend. Cross-site HTTPS sessions need `
 | Model metrics | Accuracy and end-to-end latency are not established here. Length, density, and confidence depend on the upstream service. |
 | Languages | A preference is stored; selecting it does not translate the interface. |
 | Diagnostics | Database reachability, directory readiness, and provider settings are reported. Remote inference needs its authenticated health probe. |
-| Production readiness | Count provenance, upload authorization/retention, login throttling, profile validation, reset-challenge invalidation, and SQLite foreign-key enforcement need further hardening. |
+| Production readiness | Backend regression tests and live Modal/Cloudinary/browser verification remain required. Configure durable image storage and review hosting limits before production use. |
 
-Access tokens live in memory/sessionStorage. The opaque refresh token uses an HttpOnly cookie and is hashed in the database. Ledger reads and updates are user-scoped, but upload URLs are public. Count records accept client-submitted values; they are not tamper-proof model records.
+Access tokens live in memory/sessionStorage. The opaque refresh token uses an HttpOnly cookie and is hashed in the database. Image reads require authentication and ownership for both local and Cloudinary storage. Model results are stored by the backend; saving accepts only the inference session ID. See [private storage and pipeline fixes](docs/private-storage-and-pipeline-fixes.md) for migration, deployment, and verification details.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | :--- | :--- |
-| Missing tables | Run `python -m alembic upgrade head` from `backend` before starting the API. |
+| Missing tables | Run `python -m alembic upgrade head` from `blueharvest-backend` before starting the API. |
 | `503 model_not_configured` | Enable Modal and supply both credentials in the backend. Demo mode alone does not enable inference. |
 | `502 inference_count_missing` | Match the configured count/points field to the actual model response. |
 | Model error or timeout | Check `/api/model/health`, credentials, request format, field name, and timeout. |
