@@ -61,7 +61,10 @@ export default function LoginView({
               const result = await loginWithGoogleCredential(credentialResponse.credential);
               onLoginSuccess?.(result.user);
             } catch (error) {
-              setAuthError(error.message || 'Google sign-in could not be completed. Please try again or use your password.');
+              const friendlyMessage = error.message?.toLowerCase().includes('dependency') || error.status === 503
+                ? 'Google sign-in is temporarily unavailable. Please sign in with your credentials or try again shortly.'
+                : (error.message || 'Google sign-in could not be completed. Please try again or use your password.');
+              setAuthError(friendlyMessage);
             } finally {
               setIsLoading(false);
             }
@@ -139,7 +142,10 @@ export default function LoginView({
             const result = await loginWithGoogleCredential(credentialResponse.credential);
             onLoginSuccess?.(result.user);
           } catch (error) {
-            setAuthError(error.message || 'Google sign-in could not be completed. Please try again.');
+            const friendlyMessage = error.message?.toLowerCase().includes('dependency') || error.status === 503
+              ? 'Google sign-in is temporarily unavailable. Please sign in with your credentials or try again shortly.'
+              : (error.message || 'Google sign-in could not be completed. Please try again.');
+            setAuthError(friendlyMessage);
           } finally {
             setIsLoading(false);
           }

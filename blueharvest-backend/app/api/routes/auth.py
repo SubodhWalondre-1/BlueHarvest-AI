@@ -74,7 +74,7 @@ def google_login(body: GoogleLoginRequest, response: Response, db: Session = Dep
         ) from exc
     email = str(claims.get("email", "")).strip().lower()
     subject = claims.get("sub")
-    email_verified = claims.get("email_verified") is True
+    email_verified = claims.get("email_verified") in (True, "true", "True", 1, "1")
     if not email or not subject or not email_verified:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail={"code": "unverified_google_email", "message": "Use a Google account with a verified email address."})
 
