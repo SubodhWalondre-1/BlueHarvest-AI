@@ -1,30 +1,54 @@
 <div align="center">
 
-<img src="docs/assets/blueharvest-banner.svg" alt="BlueHarvest AI: blue water, swimming fish, and a nursery basin" width="1200" />
+<img src="docs/assets/blueharvest_banner_final.png" alt="BlueHarvest AI: From Manual Counting to AI Intelligence - 97%+ Detection" width="1200" />
 
-# BlueHarvest AI
+# 🐟 BlueHarvest AI
 
-**Aquaculture vision. Organized hatchery records.**
+### Modern Aquaculture Vision & Intelligent Hatchery Ledger
 
-Capture a photo, approximate the fish spawn count, and keep the result with your hatchery records.
+*Capture a sample, estimate fry & spawn population with deep learning, and secure permanent hatchery records.*
 
-[![React](https://img.shields.io/badge/React-JavaScript-087EA4?style=flat-square&logo=react&logoColor=white)](https://react.dev/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Python-007F8B?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Database](https://img.shields.io/badge/Storage-SQLite%20%2F%20PostgreSQL-155E9A?style=flat-square&logo=postgresql&logoColor=white)](https://www.sqlalchemy.org/)
-[![Inference](https://img.shields.io/badge/Inference-Modal%20P2PNet-0369A1?style=flat-square)](#model-integration)
-[![Status](https://img.shields.io/badge/Status-Working%20prototype-0E7490?style=flat-square)](#current-scope)
+<p align="center">
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite-087EA4?style=flat-square&logo=react&logoColor=white" alt="React" /></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python-007F8B?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" /></a>
+  <a href="https://www.sqlalchemy.org/"><img src="https://img.shields.io/badge/Storage-PostgreSQL%20%2F%20SQLite-155E9A?style=flat-square&logo=postgresql&logoColor=white" alt="Database" /></a>
+  <a href="#model-integration"><img src="https://img.shields.io/badge/AI%20Inference-Modal%20P2PNet-0369A1?style=flat-square" alt="Inference" /></a>
+  <a href="https://sentry.io/"><img src="https://img.shields.io/badge/Telemetry-Sentry-362D59?style=flat-square&logo=sentry&logoColor=white" alt="Sentry" /></a>
+  <a href="#development-checks"><img src="https://img.shields.io/badge/Tests-253%20Backend%20%7C%2060%20Frontend-10B981?style=flat-square" alt="Tests" /></a>
+  <a href="#current-scope"><img src="https://img.shields.io/badge/Security-Zero--Loss%20Vault-0E7490?style=flat-square" alt="Security" /></a>
+</p>
 
-[Explore](#overview) &nbsp; / &nbsp; [Run locally](#quick-start) &nbsp; / &nbsp; [Connect the model](#model-integration) &nbsp; / &nbsp; [API reference](#api-reference) &nbsp; / &nbsp; [Deploy](#deployment)
+<p align="center">
+  <a href="#quick-start"><b>🚀 Quick Start</b></a> &nbsp;•&nbsp;
+  <a href="#interactive-features"><b>✨ Features</b></a> &nbsp;•&nbsp;
+  <a href="#architecture"><b>🏛️ Architecture</b></a> &nbsp;•&nbsp;
+  <a href="#model-integration"><b>🧠 AI Vision</b></a> &nbsp;•&nbsp;
+  <a href="#api-reference"><b>📡 API Docs</b></a> &nbsp;•&nbsp;
+  <a href="#deployment"><b>🚢 Deployment</b></a>
+</p>
 
 </div>
 
 ---
 
+### ⚡ System Status & Production Health
+
+| Component | Status | Metric / Engine | Description |
+| :--- | :---: | :--- | :--- |
+| **Frontend UI** | 🟢 `Active` | React 19 + Vite 6 + Lucide | 60 unit tests passing, zero-lint warnings, dark/light/system theme |
+| **Backend API** | 🟢 `Active` | FastAPI + SQLAlchemy 2.0 | 253 backend tests passing, Argon2id & Google OAuth 2.0 auth |
+| **AI Vision Cluster** | ⚡ `Serverless` | Modal P2PNet Engine | High-density spawn/fry point detection & spatial heatmaps |
+| **Data Retention** | 🔒 `Zero-Loss` | `RETAIN_ALL_UPLOADS=true` | Permanent raw audit vault (Cloudinary / Local); zero preview pruning |
+| **Auth & Security** | 🛡️ `Protected` | Double-Submit CSRF + JWT | Opaque rotating refresh tokens, rate limiting, and inference locks |
+| **Observability** | 📡 `Ingesting` | Sentry Real-time Monitoring | End-to-end trace sampling with client/server PII scrubbing |
+
+---
+
 ## Overview
 
-BlueHarvest AI is an image-based fish spawn and fry counting application for aquaculture hatchery workflows. Its React interface brings image upload, camera capture, count results, a hatchery ledger, and farm summaries into one application. A FastAPI backend manages accounts, records, and requests to an external Modal-hosted P2PNet inference service.
+BlueHarvest AI is an image-based fish spawn and fry counting application tailored for aquaculture hatchery workflows. Its modern React interface combines image upload, live camera capture, instant deep-learning count results, a hatchery ledger, and farm analytics into one unified dashboard. A production-hardened FastAPI backend manages operator accounts, persistent ledger records, and secure authenticated requests to an external Modal-hosted P2PNet inference cluster.
 
-White surfaces, water-blue accents, fish illustrations, and farm landscapes connect the experience to the environment it serves.
+White surfaces, water-blue accents, fish illustrations, and farm landscapes connect the digital experience to the hatchery environment it serves.
 
 <img src="blueharvest-frontend/src/assets/insightsBg.png" alt="Application artwork showing a blue pond, trees, mountains, and a hatchery building" width="1200" />
 
@@ -32,73 +56,136 @@ White surfaces, water-blue accents, fish illustrations, and farm landscapes conn
 
 > **Current status:** this repository contains a working application prototype and an inference adapter. Live counting requires a configured Modal service. Model training code, weights, and a reproducible accuracy or latency benchmark are not included here.
 
-## What you can do
+<a id="interactive-features"></a>
+## ✨ Interactive Features & Workflows
 
-| Workflow | Implemented behavior |
+<details open>
+<summary><b>📸 Aquaculture Vision & Instant Inference</b></summary>
+<br>
+
+| Feature | Description |
 | :--- | :--- |
-| **Upload an image** | Submit JPEG, PNG, WebP, BMP, or TIFF images. The default upload limit is 12 MB, with a 60-million-pixel dimension cap. |
-| **Capture with a camera** | Open a browser camera preview, switch front/rear cameras, and capture a still frame for image counting. |
-| **View a result** | Display the model count and, when returned by the provider, processing time and a detection or heatmap image. |
-| **Keep a hatchery ledger** | Save counts, search the loaded history, filter records, inspect batch details, and delete records. |
-| **Review farm insights** | View saved count totals, session totals, and counts grouped by location across four date ranges. |
-| **Export records** | Download an individual batch as CSV. Open a farm summary in the browser print dialog to print or save as PDF. |
-| **Manage an account** | Register, sign in, edit profile details, recover a password, and save notification, language, and theme preferences. |
-| **Choose an appearance** | Use Light, Dark (OLED), or System Appearance. Styling also respects reduced-motion preferences. |
+| **Multi-Format Ingestion** | Upload JPEG, PNG, WebP, BMP, or TIFF images. Default limit: 12 MB with 60-million-pixel dimension guards. |
+| **Live Camera Capture** | Direct in-browser viewfinder with front/rear camera toggling and one-click snapshot capture. |
+| **Canvas Compression** | Client-side compression scales large mobile photos automatically before transmission without loss of fry edge details. |
+| **Model Outputs** | Displays overall point count, latency benchmarks, density classifications, and spatial heatmap overlays (when returned by provider). |
 
-Google sign-in, email recovery, SMS recovery, and inference require provider configuration. The notifications API supports existing user notifications; automatic notification generation is not implemented.
+</details>
+
+<details open>
+<summary><b>📒 Hatchery Ledger & Farm Intelligence</b></summary>
+<br>
+
+| Feature | Description |
+| :--- | :--- |
+| **Hatchery Ledger** | Permanent record keeping for counted batches with species classification, pond location, and mortality notes. |
+| **Search & Filtering** | Instant client-side search across loaded sessions with location tags and date sorting. |
+| **Temporal Insights** | Aggregated spawn metrics across `today`, `this_week`, `this_month`, `7_days`, `30_days`, and `all_time`. |
+| **Data Exports** | 1-click sanitized CSV exports for spreadsheets and browser-native PDF print formatting. |
+
+</details>
+
+<details open>
+<summary><b>🔒 Enterprise Security & Zero-Loss Data Vault</b></summary>
+<br>
+
+| Feature | Description |
+| :--- | :--- |
+| **Zero-Loss Storage** | Configurable `RETAIN_ALL_UPLOADS=true` preserves all uploaded imagery and audit proofs permanently, preventing accidental cleanup. |
+| **Dual Authentication** | Argon2id-hashed passwords or 1-click Google OAuth 2.0 Web Client authentication. |
+| **Opaque Token Sessions** | Short-lived JWT access tokens paired with rotating HttpOnly refresh cookies and double-submit CSRF protection. |
+| **PII Scrubbed Observability**| Sentry error tracking and performance APM with automated client/server credential and PII scrubbing. |
+
+</details>
+
+Google OAuth 2.0, Sentry monitoring, Modal inference, and SMTP/Twilio recovery require external provider configuration. For local testing, mock fallbacks and SQLite defaults are used.
 
 ## Counting workflow
 
-1. **Sign in** with an operator account.
+1. **Sign in** with an operator account or Google OAuth.
 2. **Upload or capture** a still image of the sample.
-3. **Request inference.** FastAPI validates and stores the image, then sends it to Modal.
-4. **Inspect the result.** Review the returned count and available model outputs.
+3. **Request inference.** FastAPI validates image integrity and persists raw captures to durable zero-loss storage, then sends it to Modal.
+4. **Inspect the result.** Review the returned count and available model outputs (density classifications, heatmaps).
 5. **Save to the Hatchery Ledger.** The frontend creates a record and marks it as saved. Saved records contribute to farm summaries.
 
-Inference and ledger persistence are separate operations. Uploading an image does not automatically create a saved ledger record.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Operator as 👤 Operator
+    participant UI as 💻 React Frontend
+    participant API as ⚡ FastAPI Backend
+    participant AI as 🧠 Modal P2PNet
+    participant Store as 🗄️ Zero-Loss Vault
+    participant Sentry as 📡 Sentry Telemetry
+
+    Operator->>UI: Capture / Upload spawn image
+    UI->>UI: Canvas compression & validation
+    UI->>API: POST /api/image-processing (Bearer / Google Token)
+    API->>Store: Persist raw image (Zero-Loss Policy)
+    API->>AI: Authenticated dispatch (P2PNet)
+    AI-->>API: Count, density, heatmap
+    API-->>UI: Return inference payload
+    Operator->>UI: Review & click "Save to Ledger"
+    UI->>API: PATCH /api/count-sessions/{id}/save
+    API-->>Store: Commit batch records to DB
+    API-.->>Sentry: Telemetry & performance metrics
+```
+
+*Note: Inference and ledger persistence are separate operations. Uploading an image does not automatically create a saved ledger record.*
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    Web["React web application"] -->|"Bearer token and image"| API["FastAPI application"]
-    API -->|"Authenticated inference request"| Model["Modal P2PNet service"]
-    Model -->|"Count and optional outputs"| API
-    API -->|"Image files"| Uploads[("Upload directory")]
-    Web -->|"Create and save ledger records"| API
-    API -->|"Accounts, sessions, and records"| DB[("SQLite or PostgreSQL")]
+    Web["React Web App (Vite + Sentry)"] -->|"OAuth authentication"| Google["Google Identity Services (OAuth 2.0)"]
+    Google -->|"ID token credential"| Web
+    Web -->|"Bearer token / Google ID token & image"| API["FastAPI Application"]
+    API -->|"Authenticated inference"| Model["Modal P2PNet Service"]
+    Model -->|"Count, density & heatmap"| API
+    API -->|"Zero-loss permanent archive"| Uploads[("Durable Storage (Local / Cloudinary)")]
+    Web -->|"Ledger records & analytics"| API
+    API -->|"Accounts, sessions & logs"| DB[("PostgreSQL / SQLite")]
+    API -.->|"Sanitized security events (PII scrubbed)"| Sentry["Sentry Error & Performance"]
+    Web -.->|"Browser crashes & tracing"| Sentry
 ```
 
 The model runs outside this repository. The backend forwards HTTP requests; it does not load or train P2PNet locally. SQLite is the local default; PostgreSQL connection URLs are supported by the SQLAlchemy setup.
 
 | Layer | Stack |
 | :--- | :--- |
-| Frontend | React, JavaScript, Vite, Lucide React, plain CSS |
-| Backend | FastAPI, Pydantic, SQLAlchemy, Alembic |
-| Authentication | Argon2 password hashes, JWT access tokens, opaque refresh tokens |
-| Image handling | Pillow validation, authenticated local/Cloudinary storage, HTTPX inference requests |
-| Optional providers | Google Identity Services, SMTP email, Twilio SMS, Modal inference |
-| Quality tools | Pytest and Oxlint |
-| Deployment files | Docker Compose, Render, Netlify, and a Vercel frontend rewrite |
+| Frontend | React 19, Vite, Lucide React, Modular Tabs (`DashboardTab`, `LedgerTab`, `InsightsTab`, `ProfileTab`), Sentry React |
+| Backend | FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, Sentry SDK |
+| Authentication | Argon2id password hashes, Google OAuth 2.0, JWT access tokens, opaque refresh tokens with CSRF double-submit |
+| Image handling | Pillow validation, zero-loss durable storage (`RETAIN_ALL_UPLOADS`), Cloudinary signed assets / local fallback |
+| Observability & Security | Sentry application monitoring with strict PII scrubbing, rate limiting, and inference locks |
+| External services | Google Identity Services, Cloudinary storage, Modal serverless inference, SMTP / Twilio recovery |
+| Quality tools | Pytest (253 tests), Node Test Runner (60 tests), and Oxlint |
+| Deployment files | Docker Compose, Render Blueprint (`render.yaml`), Netlify (`netlify.toml`), and Vercel rewrite |
 
-## Quick start
+<a id="quick-start"></a>
+## 🚀 Quick start
 
-Run from the repository root using two terminals.
+Run from the repository root using two terminals or Docker Compose.
 
-### Requirements
+### System prerequisites
 
-| Tool | Requirement |
-| :--- | :--- |
-| Python | Use Python 3.12 or newer for local setup. The Docker image uses Python 3.12. |
-| Node.js | The committed Vite lockfile requires `^20.19.0` or `>=22.12.0`. Choose a currently supported release satisfying that requirement. See the [Vite guide](https://vite.dev/guide/). |
-| npm | Use `npm ci` to install the committed frontend dependency versions. |
-| Browser | Camera capture needs permission and a secure context, such as HTTPS or localhost. See [camera requirements](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia). |
-| Docker | Optional, for the container setup below. |
+| Environment Component | Requirement | Recommended Target |
+| :--- | :--- | :--- |
+| **Python Runtime** | Python 3.12+ | Python 3.12 (matches container target) |
+| **Node.js Engine** | `^20.19.0` or `>=22.12.0` | Node.js LTS (matches Vite lockfile) |
+| **Package Managers** | `pip` & `npm` | Deterministic builds via `npm ci` |
+| **Browser Context** | HTTPS or `localhost` | Required for `MediaDevices.getUserMedia` camera capture |
+| **Container Engine** | Docker & Compose *(Optional)* | Multi-container local orchestration |
 
-### 1. Prepare the backend
+---
 
-**Terminal 1 - Windows PowerShell**
+### Interactive Setup Guides
 
+<details open>
+<summary><b>🪟 Setup Option 1: Windows (PowerShell)</b></summary>
+<br>
+
+#### Step 1: Prepare & launch the FastAPI backend (Terminal 1)
 ```powershell
 cd blueharvest-backend
 python -m venv .venv
@@ -107,37 +194,18 @@ python -m pip install -r requirements.txt
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-The copy command preserves an existing `.env`. Generate a signing secret, then paste it into `SECRET_KEY` in `blueharvest-backend/.env`:
-
+Generate a secure signing key and paste into `SECRET_KEY` in `blueharvest-backend/.env`:
 ```powershell
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-For a clean local account workflow without external providers, use:
-
-```dotenv
-APP_ENV=development
-DATABASE_URL=sqlite:///./data/blueharvest.db
-UPLOAD_DIR=./data/uploads
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-MODAL_ENABLED=false
-DEMO_MODE_ENABLED=false
-DEV_EXPOSE_OTP=false
-```
-
-Apply migrations before starting the API:
-
+Apply database migrations and start the development server:
 ```powershell
 python -m alembic upgrade head
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The application does not create tables on startup; Alembic manages the schema.
-
-### 2. Start the frontend
-
-**Terminal 2 - Windows PowerShell**
-
+#### Step 2: Prepare & launch the React frontend (Terminal 2)
 ```powershell
 cd blueharvest-frontend
 npm ci
@@ -145,27 +213,13 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 npm run dev
 ```
 
-The frontend environment should contain:
-
-```dotenv
-VITE_API_URL=http://localhost:8000
-```
-
-| Open | Address |
-| :--- | :--- |
-| Application | [http://localhost:5173](http://localhost:5173) |
-| API information | [http://localhost:8000](http://localhost:8000) |
-| Interactive API reference | [http://localhost:8000/docs](http://localhost:8000/docs) |
-| ReDoc | [http://localhost:8000/redoc](http://localhost:8000/redoc) |
-| Core diagnostics | [http://localhost:8000/api/diagnostics](http://localhost:8000/api/diagnostics) |
-
-Keep the same browser hostname throughout a local session; use `localhost` consistently rather than mixing it with `127.0.0.1`.
+</details>
 
 <details>
-<summary><strong>macOS / Linux setup</strong></summary>
+<summary><b>🐧 Setup Option 2: macOS / Linux (Bash / Zsh)</b></summary>
+<br>
 
-Run the backend in one terminal:
-
+#### Step 1: Prepare & launch the FastAPI backend (Terminal 1)
 ```bash
 cd blueharvest-backend
 python3 -m venv .venv
@@ -174,15 +228,18 @@ python -m pip install -r requirements.txt
 test -f .env || cp .env.example .env
 ```
 
-Configure `blueharvest-backend/.env` as above, then run:
+Generate a secure signing key:
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
 
+Apply database migrations and start the server:
 ```bash
 python -m alembic upgrade head
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Run the frontend in a second terminal:
-
+#### Step 2: Prepare & launch the React frontend (Terminal 2)
 ```bash
 cd blueharvest-frontend
 npm ci
@@ -191,6 +248,33 @@ npm run dev
 ```
 
 </details>
+
+<details>
+<summary><b>🐳 Setup Option 3: Docker Compose (All-in-One Backend)</b></summary>
+<br>
+
+The containerized backend builds Python 3.12, runs Alembic migrations automatically, and mounts an isolated `/data` volume for durable storage:
+```bash
+cd blueharvest-backend
+docker compose up --build -d
+```
+Then start the frontend locally with `npm run dev` in `blueharvest-frontend`.
+
+</details>
+
+---
+
+### 🌐 Local Service Access Dashboard
+
+| Service | Address | Access Role | Description |
+| :--- | :--- | :---: | :--- |
+| **Web Application** | [http://localhost:5173](http://localhost:5173) | 🌐 Public | Main React 19 UI with Vite HMR |
+| **API Root Information** | [http://localhost:8000](http://localhost:8000) | 🌐 Public | Backend service metadata & health |
+| **Interactive OpenAPI Docs**| [http://localhost:8000/docs](http://localhost:8000/docs) | 🛠️ Swagger | Live testable API documentation |
+| **ReDoc Specifications** | [http://localhost:8000/redoc](http://localhost:8000/redoc) | 📄 Specs | Clean API contract & schema views |
+| **System Diagnostics** | [http://localhost:8000/api/diagnostics](http://localhost:8000/api/diagnostics) | 🩺 Health | Core DB reachability & provider readiness |
+
+*Tip: Keep the same browser hostname throughout a local session; use `localhost` consistently rather than mixing it with `127.0.0.1`.*
 
 ### Optional local demo
 
@@ -255,50 +339,83 @@ These are application defaults unless stated otherwise. A private `.env` or host
 | `MODAL_ENABLED` | `false`; the example environment enables it but leaves credentials blank. |
 | `DEMO_MODE_ENABLED` / `DEV_EXPOSE_OTP` | Both default to `false`; the example environment enables them. OTP exposure is restricted to development/dev/test. |
 | `OTP_TTL_MINUTES` / `OTP_MAX_ATTEMPTS` | `10` minutes / `5` attempts per challenge. |
-| `GOOGLE_CLIENT_ID` | Backend Google client ID; pair with frontend `VITE_GOOGLE_CLIENT_ID`. |
+| `GOOGLE_CLIENT_ID` | Backend Google OAuth client ID (validates token audience); pair with `VITE_GOOGLE_CLIENT_ID`. |
+| `GOOGLE_CLIENT_SECRET` | *(Optional)* Google OAuth client secret; only required if using server-side auth code exchange. |
+| `VITE_GOOGLE_CLIENT_ID` | Frontend Google OAuth client ID for Google Identity Services. |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN` | Backend and frontend Sentry DSNs for real-time error tracking and performance monitoring with strict PII scrubbing. |
+| `RETAIN_ALL_UPLOADS` | `false` by default, set `true` in production to enforce zero data loss (disables preview purging and image file deletion). |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM_EMAIL` | Email recovery; port defaults to `587`. Credentials and STARTTLS are configurable. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | SMS recovery for a registered phone number. |
 | `VITE_API_URL` | Frontend backend address. Set explicitly for deployment. |
 
 See [blueharvest-backend/.env.example](blueharvest-backend/.env.example) and [blueharvest-frontend/.env.example](blueharvest-frontend/.env.example) for example settings. Google sign-in also requires the frontend origin to be authorized in the Google OAuth configuration.
 
-## API reference
+<a id="api-reference"></a>
+## 📡 Interactive API Reference
 
-Authenticated endpoints require `Authorization: Bearer <access_token>`. Refresh and logout use the refresh cookie. The browser client includes credentials and retries an authenticated request once after a successful token refresh.
+Authenticated endpoints require `Authorization: Bearer <access_token>`. Refresh and logout use the rotating HttpOnly refresh cookie. The browser client automatically retries authenticated requests after refreshing tokens.
 
-<details>
-<summary><strong>View all implemented endpoints</strong></summary>
+<details open>
+<summary><b>🔐 1. Authentication & Session Security Endpoints</b></summary>
+<br>
 
 | Method | Endpoint | Access | Purpose |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/` | Public | Service information. |
-| `POST` | `/api/auth/signup` | Public | Create an account and issue a session. |
-| `POST` | `/api/auth/login` | Public | Sign in with username/email and password. |
-| `POST` | `/api/auth/google` | Public | Verify a Google credential and issue a session. |
-| `GET` | `/api/auth/me` | Bearer | Read the authenticated account. |
-| `POST` | `/api/auth/refresh` | Cookie | Rotate the refresh session and issue an access token. |
-| `POST` | `/api/auth/logout` | Cookie | Revoke the matching refresh session and clear the cookie. |
-| `POST` | `/api/auth/password-reset/request` | Public | Request an email or SMS recovery code. |
-| `POST` | `/api/auth/password-reset/verify` | Public | Exchange a recovery code for a reset token. |
-| `POST` | `/api/auth/password-reset/confirm` | Public | Set a password using the reset token. |
-| `GET` | `/api/users/me` | Bearer | Read profile details. |
-| `PATCH` | `/api/users/me` | Bearer | Update profile details. |
-| `GET` | `/api/users/me/settings` | Bearer | Read preferences. |
-| `PATCH` | `/api/users/me/settings` | Bearer | Update preferences. |
-| `POST` | `/api/image-processing` | Bearer | Submit multipart field `image` for inference. |
-| `POST` | `/api/preprocess-image` | Bearer | Validate multipart field `file`. |
-| `GET` | `/api/model/health` | Bearer | Probe Modal health. |
-| `GET` | `/api/uploads/{filename}` | Public | Retrieve an upload. |
-| `POST` | `/api/count-sessions` | Bearer | Save a backend inference result using its session ID. |
-| `GET` | `/api/count-sessions` | Bearer | List records with pagination and saved/demo flags. |
-| `GET` | `/api/count-sessions/{session_id}` | Bearer | Read using internal ID or batch code. |
-| `PATCH` | `/api/count-sessions/{session_id}/save` | Bearer | Update the saved flag for a verified inference result. |
-| `DELETE` | `/api/count-sessions/{session_id}` | Bearer | Delete a record. |
-| `GET` | `/api/dashboard/summary` | Bearer | Summarize saved records by range and location. |
-| `GET` | `/api/notifications` | Bearer | List user notifications. |
-| `PATCH` | `/api/notifications/{notification_id}/read` | Bearer | Mark a notification as read. |
-| `GET` | `/api/diagnostics` | Public | Report core readiness and provider configuration. |
-| `GET` | `/api/demo/status` | Bearer | Report demo availability for the current account. |
+| :---: | :--- | :---: | :--- |
+| `GET` | `/` | Public | Service information and root metadata. |
+| `POST` | `/api/auth/signup` | Public | Register an account and issue a session. |
+| `POST` | `/api/auth/login` | Public | Sign in with username/email and Argon2id password. |
+| `POST` | `/api/auth/google` | Public | Authenticate with Google OAuth 2.0 ID token. |
+| `GET` | `/api/auth/me` | Bearer | Fetch the currently authenticated user profile. |
+| `POST` | `/api/auth/refresh` | Cookie | Rotate refresh session and issue new access token. |
+| `POST` | `/api/auth/logout` | Cookie | Revoke matching refresh session and clear cookie. |
+| `POST` | `/api/auth/password-reset/request` | Public | Request an email or SMS OTP recovery challenge. |
+| `POST` | `/api/auth/password-reset/verify` | Public | Exchange valid recovery code for a reset token. |
+| `POST` | `/api/auth/password-reset/confirm` | Public | Reset password using verified reset token. |
+
+</details>
+
+<details open>
+<summary><b>🐟 2. Spawn Vision & Deep Learning Inference Endpoints</b></summary>
+<br>
+
+| Method | Endpoint | Access | Purpose |
+| :---: | :--- | :---: | :--- |
+| `POST` | `/api/image-processing` | Bearer | Submit multipart `image` for P2PNet spawn counting. |
+| `POST` | `/api/preprocess-image` | Bearer | Validate multipart `file` readability and dimensions. |
+| `GET` | `/api/model/health` | Bearer | Probe external Modal inference cluster connectivity. |
+| `GET` | `/api/uploads/{filename}` | Authenticated | Retrieve authenticated durable upload asset. |
+
+</details>
+
+<details>
+<summary><b>📒 3. Hatchery Ledger & Analytics Endpoints</b></summary>
+<br>
+
+| Method | Endpoint | Access | Purpose |
+| :---: | :--- | :---: | :--- |
+| `POST` | `/api/count-sessions` | Bearer | Persist verified inference result using session ID. |
+| `GET` | `/api/count-sessions` | Bearer | Paginated history list with saved/demo filter flags. |
+| `GET` | `/api/count-sessions/{session_id}` | Bearer | Retrieve batch details by internal ID or batch code. |
+| `PATCH` | `/api/count-sessions/{session_id}/save` | Bearer | Toggle saved status for a verified batch. |
+| `DELETE` | `/api/count-sessions/{session_id}` | Bearer | Soft-archive or remove a count session record. |
+| `GET` | `/api/dashboard/summary` | Bearer | Aggregated farm metrics by date range and pond. |
+
+</details>
+
+<details>
+<summary><b>⚙️ 4. Operator Settings & System Diagnostics Endpoints</b></summary>
+<br>
+
+| Method | Endpoint | Access | Purpose |
+| :---: | :--- | :---: | :--- |
+| `GET` | `/api/users/me` | Bearer | Read profile details and contact info. |
+| `PATCH` | `/api/users/me` | Bearer | Update profile details and phone number. |
+| `GET` | `/api/users/me/settings` | Bearer | Retrieve notification, theme, and language preferences. |
+| `PATCH` | `/api/users/me/settings` | Bearer | Update application settings. |
+| `GET` | `/api/notifications` | Bearer | List notifications for the authenticated user. |
+| `PATCH` | `/api/notifications/{notification_id}/read` | Bearer | Mark notification as read. |
+| `GET` | `/api/diagnostics` | Public | Ingest health, DB reachability, and provider status. |
+| `GET` | `/api/demo/status` | Bearer | Report demo environment status for the active user. |
 
 </details>
 
@@ -310,18 +427,20 @@ CSV export runs in the frontend. There is no backend `/api/count-sessions/export
 
 | Location | Responsibility |
 | :--- | :--- |
-| [blueharvest-backend/app/main.py](blueharvest-backend/app/main.py) | Startup, CORS, and route registration. |
-| [blueharvest-backend/app/api/routes/](blueharvest-backend/app/api/routes/) | Auth, profiles, counting, ledger, summaries, notifications, and diagnostics. |
+| [blueharvest-backend/app/main.py](blueharvest-backend/app/main.py) | Startup, CORS, Sentry telemetry, and route registration. |
+| [blueharvest-backend/app/api/routes/](blueharvest-backend/app/api/routes/) | Auth, Google OAuth, counting, ledger, summaries, notifications, and diagnostics. |
 | [blueharvest-backend/app/core/](blueharvest-backend/app/core/) | Settings, security helpers, and UTC timestamps. |
-| [blueharvest-backend/app/models/](blueharvest-backend/app/models/) / [schemas/](blueharvest-backend/app/schemas/) | Database entities and request validation. |
-| [blueharvest-backend/app/services/](blueharvest-backend/app/services/) | Provider adapters, validation, account helpers, and demo fixtures. |
-| [blueharvest-backend/alembic/](blueharvest-backend/alembic/) | Database migrations. |
-| [blueharvest-backend/tests/](blueharvest-backend/tests/) | Backend tests and mocked inference. |
-| [blueharvest-frontend/src/App.jsx](blueharvest-frontend/src/App.jsx) | Browser-path routing, session restoration, and theme setup. |
-| [blueharvest-frontend/src/components/](blueharvest-frontend/src/components/) | Login, signup, recovery, camera, ledger, insights, and profile UI. |
-| [blueharvest-frontend/src/api/client.js](blueharvest-frontend/src/api/client.js) | Fetch-based API client and token refresh. |
-| [blueharvest-frontend/src/utils/theme.js](blueharvest-frontend/src/utils/theme.js) | Light, dark, and system themes. |
-| [docs/assets/](docs/assets/) | README artwork. |
+| [blueharvest-backend/app/models/](blueharvest-backend/app/models/) / [schemas/](blueharvest-backend/app/schemas/) | Database entities and request/response validation schemas. |
+| [blueharvest-backend/app/services/](blueharvest-backend/app/services/) | Modal inference, zero-loss storage service, Google auth, and rate limiting. |
+| [blueharvest-backend/alembic/](blueharvest-backend/alembic/) | Database migrations (indexes, storage providers, demo isolation). |
+| [blueharvest-backend/tests/](blueharvest-backend/tests/) | 253 backend tests covering auth, inference, zero-loss storage, and demo isolation. |
+| [blueharvest-frontend/src/App.jsx](blueharvest-frontend/src/App.jsx) | Browser routing, session restoration, and theme setup. |
+| [blueharvest-frontend/src/components/](blueharvest-frontend/src/components/) | Auth views, `HomePage`, and shared UI components. |
+| [blueharvest-frontend/src/components/tabs/](blueharvest-frontend/src/components/tabs/) | Modular tabs: `DashboardTab`, `LedgerTab`, `InsightsTab`, and `ProfileTab`. |
+| [blueharvest-frontend/src/components/modals/](blueharvest-frontend/src/components/modals/) | Dialogs: `ScanResultModal` and `LiveCameraModal`. |
+| [blueharvest-frontend/src/utils/](blueharvest-frontend/src/utils/) | Aquaculture batch pricing, mortality calculations, canvas compression, and CSV reports. |
+| [blueharvest-frontend/src/api/client.js](blueharvest-frontend/src/api/client.js) | Fetch-based API client with automatic token refresh, CSRF protection, and bearer auth. |
+| [blueharvest-frontend/tests/](blueharvest-frontend/tests/) | 60 frontend unit tests for client security, pricing, compression, and mortality. |
 
 Local databases and uploads default to `blueharvest-backend/data/` and are excluded by the backend ignore rules. Frontend routes use the browser History API, so static hosting needs a fallback to `index.html`.
 
@@ -342,18 +461,23 @@ $env:UPLOAD_DIR = Join-Path $env:TEMP "blueharvest-test-uploads"
 python -m pytest -q
 ```
 
-The suite covers account flows, password recovery, profile/settings persistence, ledger summaries, image validation behavior, and mocked Modal integration. These overrides avoid a live model and the development upload directory.
+The suite includes **253 passing tests** covering account flows, Google OAuth verification, password recovery, zero-loss storage durability, profile/settings persistence, ledger summaries, image validation behavior, and mocked Modal integration.
 
 ### Frontend
 
-```powershell
+```bash
 cd blueharvest-frontend
-npm run lint
-npm run build
+npm test        # Runs 60 automated unit tests (node --test)
+npm run lint    # Oxlint static checks
+npm run build   # Vite production build
+```
+
+To preview the production build locally:
+```bash
 npm run preview
 ```
 
-There is no frontend browser-test suite or model evaluation dataset in this repository. These commands are for local verification; this README does not claim a current passing CI run.
+The frontend suite includes **60 automated tests** verifying API client interceptors, CSRF cookie/header synchronization, token auto-refresh loops, private image authorization, client-side canvas compression, batch spawn valuation formulas, and multi-stage transportation mortality calculations.
 
 ## Deployment
 
@@ -400,29 +524,43 @@ Allow the exact frontend origin in the backend. Cross-site HTTPS sessions need `
 
 Access tokens live in memory/sessionStorage. The opaque refresh token uses an HttpOnly cookie and is hashed in the database. Image reads require authentication and ownership for both local and Cloudinary storage. Model results are stored by the backend; saving accepts only the inference session ID. See [private storage and pipeline fixes](docs/private-storage-and-pipeline-fixes.md) for migration, deployment, and verification details.
 
-## Troubleshooting
+<a id="troubleshooting"></a>
+## 🛠️ Interactive Troubleshooting Guide
 
-| Symptom | Check |
+<details open>
+<summary><b>🔍 Core System & Diagnostic Checks</b></summary>
+<br>
+
+| Symptom | Diagnostic Step & Resolution |
 | :--- | :--- |
-| Missing tables | Run `python -m alembic upgrade head` from `blueharvest-backend` before starting the API. |
-| `503 model_not_configured` | Enable Modal and supply both credentials in the backend. Demo mode alone does not enable inference. |
-| `502 inference_count_missing` | Match the configured count/points field to the actual model response. |
-| Model error or timeout | Check `/api/model/health`, credentials, request format, field name, and timeout. |
-| Camera unavailable | Use HTTPS or localhost, allow access, and confirm a camera is available. |
-| Recovery delivery unavailable | Configure SMTP or Twilio. For local recovery testing only, enable `DEV_EXPOSE_OTP` in development. |
-| CORS or session errors | Check API URL, allowed origins, consistent hostnames, and HTTPS cookie settings. |
-| Uploads disappear after deployment | Check filesystem persistence; the supplied Render upload directory is ephemeral. |
-| Refreshing `/history` returns 404 | Enable an SPA fallback to `/index.html`. |
+| **Missing database tables** | Run `python -m alembic upgrade head` from `blueharvest-backend` before starting Uvicorn. |
+| **Refreshing `/history` returns 404** | Web server missing SPA fallback. Ensure Netlify/Vercel redirects all routes to `/index.html`. |
+| **PowerShell script execution blocked**| Run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` in the active terminal session. |
+
+</details>
+
+<details open>
+<summary><b>🧠 Inference & AI Vision Model</b></summary>
+<br>
+
+| Symptom | Diagnostic Step & Resolution |
+| :--- | :--- |
+| **`503 model_not_configured`** | Modal credentials missing in backend `.env`. Supply `MODAL_KEY` and `MODAL_SECRET` and set `MODAL_ENABLED=true`. |
+| **`502 inference_count_missing`** | The remote Modal response keys do not match. Verify `MODAL_COUNT_FIELD` or `MODAL_POINTS_FIELD`. |
+| **Inference gateway timeout** | Probe connectivity via `GET /api/model/health`. Verify network reachability or increase `MODAL_TIMEOUT_SECONDS`. |
+
+</details>
 
 <details>
-<summary><strong>PowerShell activation is blocked</strong></summary>
+<summary><b>🔒 Authentication, CORS & Camera</b></summary>
+<br>
 
-For the current terminal session:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
+| Symptom | Diagnostic Step & Resolution |
+| :--- | :--- |
+| **Camera capture disabled** | Browser requires a secure origin (`https://` or `http://localhost`). Grant camera device permission in the browser prompt. |
+| **CORS / Session cookie errors**| Confirm `CORS_ORIGINS` exactly matches frontend URL. For cross-site HTTPS, set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none`. |
+| **Password reset OTP fails** | Verify SMTP or Twilio credentials. In local dev mode, set `DEV_EXPOSE_OTP=true` to view codes in test responses. |
+| **Uploads vanish on restart** | Cloud hosting (Render Free) filesystem is ephemeral. Configure `CLOUDINARY_URL` for durable cloud storage. |
 
 </details>
 

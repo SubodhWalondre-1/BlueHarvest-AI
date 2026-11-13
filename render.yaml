@@ -55,7 +55,7 @@ services:
       - key: CLOUDINARY_URL
         sync: false
       - key: GOOGLE_CLIENT_ID
-        sync: false
+        value: 537540751411-6b4bomsui4f4co6ki1jq1m1vt4pt41na.apps.googleusercontent.com
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: SENTRY_DSN

@@ -5,6 +5,7 @@
 
 [build.environment]
   VITE_API_URL = "https://blueharvest-api.onrender.com"
+  VITE_GOOGLE_CLIENT_ID = "537540751411-6b4bomsui4f4co6ki1jq1m1vt4pt41na.apps.googleusercontent.com"
 
 [[redirects]]
   from = "/*"

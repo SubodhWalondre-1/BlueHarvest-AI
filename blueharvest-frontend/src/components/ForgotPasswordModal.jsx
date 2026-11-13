@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Mail, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
+import { X, Mail, CheckCircle2, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { requestPasswordReset, verifyPasswordReset, confirmPasswordReset } from '../api/client';
 
 export default function ForgotPasswordModal({ isOpen, onClose }) {
@@ -153,7 +153,16 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
                       autoComplete="email"
                     />
                   </div>
-                  {error && <span className="field-error-message">{error}</span>}
+                  {error && (
+                    <div className="auth-alert-banner" role="alert">
+                      <div className="auth-alert-icon-wrap" aria-hidden="true">
+                        <AlertCircle size={18} className="auth-alert-icon" />
+                      </div>
+                      <div className="auth-alert-content">
+                        <span className="auth-alert-text">{error}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button type="submit" className="action-btn primary-login-btn modal-submit-btn" disabled={isLoading}>
                   {isLoading ? <span className="btn-loading-state"><Loader2 size={18} className="spin-icon" /><span>Sending code…</span></span> : <span>Send Recovery Code</span>}
@@ -165,8 +174,15 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
               <form onSubmit={handleVerifyCode} className="modal-form">
                 {message && <p className="modal-description">{message}</p>}
                 {developmentCode && (
-                  <div className="field-error-message" role="status" style={{ marginBottom: 12 }}>
-                    Local development OTP: <strong>{developmentCode}</strong>. This appears only when DEV_EXPOSE_OTP is enabled in development.
+                  <div className="auth-alert-banner" role="status" style={{ borderLeftColor: '#3b82f6', background: 'rgba(239, 246, 255, 0.95)', marginBottom: 12 }}>
+                    <div className="auth-alert-icon-wrap" style={{ color: '#2563eb' }} aria-hidden="true">
+                      <CheckCircle2 size={18} />
+                    </div>
+                    <div className="auth-alert-content">
+                      <span className="auth-alert-text" style={{ color: '#1e3a8a' }}>
+                        Local development OTP: <strong>{developmentCode}</strong>
+                      </span>
+                    </div>
                   </div>
                 )}
                 <div className={`form-group ${error ? 'has-error' : ''}`}>
@@ -174,7 +190,16 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
                   <div className="neumorphic-input-box">
                     <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="neumorphic-input" placeholder="000000" value={code} onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }} autoFocus />
                   </div>
-                  {error && <span className="field-error-message">{error}</span>}
+                  {error && (
+                    <div className="auth-alert-banner" role="alert">
+                      <div className="auth-alert-icon-wrap" aria-hidden="true">
+                        <AlertCircle size={18} className="auth-alert-icon" />
+                      </div>
+                      <div className="auth-alert-content">
+                        <span className="auth-alert-text">{error}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button type="submit" className="action-btn primary-login-btn modal-submit-btn" disabled={isLoading}>
                   {isLoading ? <span className="btn-loading-state"><Loader2 size={18} className="spin-icon" /><span>Verifying…</span></span> : <span>Verify Code <ArrowRight size={16} /></span>}
@@ -191,7 +216,16 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
                 <div className="form-group">
                   <label className="form-label">Confirm New Password</label>
                   <div className="neumorphic-input-box"><input type="password" className="neumorphic-input" autoComplete="new-password" placeholder="Re-enter new password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }} /></div>
-                  {error && <span className="field-error-message">{error}</span>}
+                  {error && (
+                    <div className="auth-alert-banner" role="alert">
+                      <div className="auth-alert-icon-wrap" aria-hidden="true">
+                        <AlertCircle size={18} className="auth-alert-icon" />
+                      </div>
+                      <div className="auth-alert-content">
+                        <span className="auth-alert-text">{error}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button type="submit" className="action-btn primary-login-btn modal-submit-btn" disabled={isLoading}>
                   {isLoading ? <span className="btn-loading-state"><Loader2 size={18} className="spin-icon" /><span>Updating password…</span></span> : <span>Update Password</span>}

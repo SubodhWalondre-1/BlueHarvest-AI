@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { getDiagnostics, loginUser, loginWithGoogleCredential } from '../api/client';
+
+const DEFAULT_GOOGLE_CLIENT_ID = '537540751411-6b4bomsui4f4co6ki1jq1m1vt4pt41na.apps.googleusercontent.com';
 
 const loadGoogleIdentityScript = () => new Promise((resolve, reject) => {
   if (window.google?.accounts?.id) return resolve();
@@ -32,11 +34,60 @@ export default function LoginView({
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [authError, setAuthError] = useState('');
   const [demoAvailable, setDemoAvailable] = useState(false);
+  const [googleNativeMounted, setGoogleNativeMounted] = useState(false);
+  const googleBtnContainerRef = useRef(null);
+
   useEffect(() => {
     let active = true;
     getDiagnostics().then((data) => { if (active) setDemoAvailable(Boolean(data.demo_mode?.enabled)); }).catch(() => {});
     return () => { active = false; };
   }, []);
+
+  // Initialize Google Identity Services and mount native button
+  useEffect(() => {
+    let active = true;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    loadGoogleIdentityScript()
+      .then(() => {
+        if (!active || !window.google?.accounts?.id || !googleBtnContainerRef.current) return;
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (credentialResponse) => {
+            try {
+              if (!credentialResponse?.credential) throw new Error('Google did not return an identity credential.');
+              setIsLoading(true);
+              const result = await loginWithGoogleCredential(credentialResponse.credential);
+              onLoginSuccess?.(result.user);
+            } catch (error) {
+              setAuthError(error.message || 'Google sign-in could not be completed. Please try again or use your password.');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        });
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+                       document.documentElement.classList.contains('dark-theme');
+
+        window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
+          theme: isDark ? 'filled_black' : 'outline',
+          size: 'large',
+          type: 'standard',
+          shape: 'pill',
+          text: 'continue_with',
+          logo_alignment: 'left',
+          width: 320,
+        });
+        setGoogleNativeMounted(true);
+      })
+      .catch((err) => {
+        console.warn('Google Identity script load error:', err);
+      });
+
+    return () => { active = false; };
+  }, [onLoginSuccess]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -56,7 +107,7 @@ export default function LoginView({
       const result = await loginUser({ username: username.trim(), password });
       onLoginSuccess?.(result.user);
     } catch (error) {
-      setAuthError(error.message || 'Login failed. Please try again.');
+      setAuthError(error.message || 'Login failed. Please check your credentials and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -64,33 +115,43 @@ export default function LoginView({
 
   const handleGoogleLogin = async () => {
     setAuthError('');
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      setAuthError('Google sign-in is not configured yet. Set VITE_GOOGLE_CLIENT_ID after creating a Google OAuth Web Client.');
+      setAuthError('Google Sign-In is temporarily unavailable. Please sign in with your username and password.');
       return;
     }
 
     setIsLoading(true);
     try {
       await loadGoogleIdentityScript();
+      if (!window.google?.accounts?.id) {
+        throw new Error('Google Identity Services script is unavailable.');
+      }
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: async (credentialResponse) => {
           try {
             if (!credentialResponse?.credential) throw new Error('Google did not return an identity credential.');
+            setIsLoading(true);
             const result = await loginWithGoogleCredential(credentialResponse.credential);
             onLoginSuccess?.(result.user);
           } catch (error) {
-            setAuthError(error.message || 'Google sign-in failed.');
+            setAuthError(error.message || 'Google sign-in could not be completed. Please try again.');
           } finally {
             setIsLoading(false);
           }
         },
       });
-      window.google.accounts.id.prompt();
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed()) {
+          const reason = notification.getNotDisplayedReason();
+          console.warn('[Google One Tap] Not displayed:', reason);
+        }
+      });
       setIsLoading(false);
-    } catch {
-      setAuthError('Google sign-in could not load. Check your network and OAuth configuration.');
+    } catch (err) {
+      console.error('[Google Sign-In]', err);
+      setAuthError('Unable to connect to Google Services. Please check your network connection or sign in with your credentials.');
       setIsLoading(false);
     }
   };
@@ -287,24 +348,39 @@ export default function LoginView({
             )}
           </button>
         </form>
-        {authError && <div className="field-error-message" role="alert" style={{ marginTop: 8 }}>{authError}</div>}
 
-        {/* Continue with Google */}
-        <button
-          type="button"
-          className="action-btn google-login-btn"
-          onClick={handleGoogleLogin}
-          disabled={isLoading}
-        >
-          {/* Authentic Google Multi-color G */}
-          <svg className="google-icon" width="22" height="22" viewBox="0 0 48 48">
-            <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/>
-            <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/>
-            <path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/>
-            <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/>
-          </svg>
-          <span className="google-btn-text">Continue with Google</span>
-        </button>
+        {/* Professional Alert Banner */}
+        {authError && (
+          <div className="auth-alert-banner" role="alert">
+            <div className="auth-alert-icon-wrap" aria-hidden="true">
+              <AlertCircle size={18} className="auth-alert-icon" />
+            </div>
+            <div className="auth-alert-content">
+              <span className="auth-alert-text">{authError}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Continue with Google: Native button mount with styled fallback */}
+        <div className="google-native-btn-container" ref={googleBtnContainerRef}>
+          {!googleNativeMounted && (
+            <button
+              type="button"
+              className="action-btn google-login-btn"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+            >
+              {/* Authentic Google Multi-color G */}
+              <svg className="google-icon" width="22" height="22" viewBox="0 0 48 48">
+                <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/>
+                <path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/>
+                <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/>
+              </svg>
+              <span className="google-btn-text">Continue with Google</span>
+            </button>
+          )}
+        </div>
 
         {/* Bottom Section Resting on Wave */}
         <div className="bottom-wave-section">

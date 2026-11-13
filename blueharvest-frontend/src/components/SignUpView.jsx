@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { signupUser } from '../api/client';
 
 export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
@@ -231,7 +231,16 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
             )}
           </button>
         </form>
-        {errors.form && <div className="field-error-message" role="alert" style={{ marginTop: 8 }}>{errors.form}</div>}
+        {errors.form && (
+          <div className="auth-alert-banner" role="alert">
+            <div className="auth-alert-icon-wrap" aria-hidden="true">
+              <AlertCircle size={18} className="auth-alert-icon" />
+            </div>
+            <div className="auth-alert-content">
+              <span className="auth-alert-text">{errors.form}</span>
+            </div>
+          </div>
+        )}
 
         <div className="bottom-wave-section">
           <p className="registration-prompt">Already have an account?</p>
