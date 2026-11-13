@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from email import policy
 from email.parser import BytesParser
 from io import BytesIO
@@ -107,8 +107,13 @@ def test_failed_inference_removes_the_remote_asset(client, registered, storage, 
 
 def test_other_account_cannot_trigger_remote_download(client, registered, storage):
     result = upload(client, registered, storage).json()
-    other = client.post("/api/auth/signup", json={"full_name": "Other Owner", "username": "other_storage",
+    other_resp = client.post("/api/auth/signup", json={"full_name": "Other Owner", "username": "other_storage",
         "email": "other-storage@example.com", "pond_location": "Other Pond", "password": "OtherPassword!123"}).json()
+    if other_resp.get("verification_required"):
+        other_verify = client.post("/api/auth/signup/verify", json={"email": "other-storage@example.com", "code": other_resp["otp"]})
+        other = other_verify.json()
+    else:
+        other = other_resp
     previous = len(storage["calls"])
     assert client.get(result["image_url"], headers={"Authorization": f"Bearer {other['access_token']}"}).status_code == 404
     assert len(storage["calls"]) == previous
@@ -189,3 +194,4 @@ def test_cloudinary_url_credentials_are_decoded_without_a_global_sdk_config(clie
     with pytest.raises(HTTPException) as rejected:
         storage_service.storage_provider()
     assert rejected.value.status_code == 503
+

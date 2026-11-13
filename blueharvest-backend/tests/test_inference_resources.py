@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import BytesIO
@@ -30,6 +30,7 @@ def resource_db(tmp_path, monkeypatch):
     upload_dir = tmp_path / "uploads"
     upload_dir.mkdir()
     monkeypatch.setattr(settings, "upload_dir", str(upload_dir))
+    monkeypatch.setattr(settings, "retain_all_uploads", False)
     with sessions() as db:
         for index in (1, 2):
             db.add(User(id=f"resource-user-{index}", username=f"resource_{index}", full_name="Resource Operator", email=f"resource{index}@example.com"))
@@ -319,8 +320,13 @@ def test_legacy_foreign_image_path_cannot_delete_another_users_image(client, reg
 
     monkeypatch.setattr(image_processing, "count_fish_image", count)
     result = upload(client, registered, image_bytes).json()
-    other = client.post("/api/auth/signup", json={"full_name": "Other Operator", "username": "other_delete",
+    other_resp = client.post("/api/auth/signup", json={"full_name": "Other Operator", "username": "other_delete",
         "email": "other-delete@example.com", "pond_location": "Other Pond", "password": "OtherPassword!123"}).json()
+    if other_resp.get("verification_required"):
+        other_verify = client.post("/api/auth/signup/verify", json={"email": "other-delete@example.com", "code": other_resp["otp"]})
+        other = other_verify.json()
+    else:
+        other = other_resp
     forged_id = str(uuid4())
     provider = app.dependency_overrides[get_db]()
     try:
@@ -396,3 +402,6 @@ def test_stale_previews_expire_without_removing_saved_or_unverified_history(reso
         assert not (settings.uploads_path / f"{1:032x}.png").exists()
         assert (settings.uploads_path / f"{2:032x}.png").exists()
         assert (settings.uploads_path / f"{3:032x}.png").exists()
+
+
+

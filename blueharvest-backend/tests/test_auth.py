@@ -1,11 +1,21 @@
-def test_signup_login_and_me(client):
+﻿def test_signup_login_and_me(client):
     result = client.post("/api/auth/signup", json={
         "full_name": "Test Operator", "username": "operator_one",
         "email": "operator1@example.com", "phone": None,
         "pond_location": "Pond One", "password": "LongPassword!123",
     })
     assert result.status_code == 201, result.text
-    response = result.json()
+    signup_data = result.json()
+    assert signup_data["verification_required"] is True
+    assert signup_data["email"] == "operator1@example.com"
+
+    # Verify OTP code sent via email
+    verify_resp = client.post("/api/auth/signup/verify", json={
+        "email": signup_data["email"],
+        "code": signup_data["otp"],
+    })
+    assert verify_resp.status_code == 200, verify_resp.text
+    response = verify_resp.json()
     assert response["user"]["email"] == "operator1@example.com"
     assert response["access_token"]
 

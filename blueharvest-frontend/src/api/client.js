@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BlueHarvest API client.
  * Local by default; set VITE_API_URL to intentionally target another environment.
  * Access tokens are held in memory/sessionStorage, while the refresh token is an
@@ -184,8 +184,28 @@ export async function signupUser(payload) {
       password: payload.password,
     }),
   });
-  setAccessToken(data.access_token);
+  if (data?.access_token) {
+    setAccessToken(data.access_token);
+  }
   return data;
+}
+
+export async function verifySignupOtp({ email, code }) {
+  const data = await apiRequest('/api/auth/signup/verify', {
+    method: 'POST', auth: false,
+    body: jsonBody({ email, code }),
+  });
+  if (data?.access_token) {
+    setAccessToken(data.access_token);
+  }
+  return data;
+}
+
+export async function resendSignupOtp({ email }) {
+  return await apiRequest('/api/auth/signup/resend', {
+    method: 'POST', auth: false,
+    body: jsonBody({ email }),
+  });
 }
 
 export async function loginWithGoogleCredential(credential) {
@@ -359,6 +379,8 @@ export default {
   fetchUploadedImage,
   loginUser,
   signupUser,
+  verifySignupOtp,
+  resendSignupOtp,
   loginWithGoogleCredential,
   logoutUser,
   restoreAuthSession,
@@ -382,3 +404,4 @@ export default {
   preprocessImage,
   getDiagnostics,
 };
+

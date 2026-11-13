@@ -1,4 +1,4 @@
-from io import BytesIO
+﻿from io import BytesIO
 from urllib.parse import quote
 
 import pytest
@@ -43,7 +43,15 @@ def other_user(client):
         "pond_location": "Other Pond", "password": "OtherPassword!123",
     })
     assert response.status_code == 201, response.text
-    return response.json()
+    body = response.json()
+    if body.get("verification_required"):
+        verify_resp = client.post("/api/auth/signup/verify", json={
+            "email": body["email"],
+            "code": body["otp"],
+        })
+        assert verify_resp.status_code == 200, verify_resp.text
+        return verify_resp.json()
+    return body
 
 
 def test_uploaded_image_requires_bearer_authentication(client, uploaded):
@@ -224,3 +232,4 @@ def test_download_media_type_comes_from_validated_image_content(client, register
     downloaded = client.get(response.json()["image_url"], headers=headers)
     assert downloaded.status_code == 200 and downloaded.content == data.getvalue()
     assert downloaded.headers["content-type"] == media_type
+

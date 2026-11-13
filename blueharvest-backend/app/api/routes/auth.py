@@ -1,3 +1,6 @@
+﻿import hashlib
+import hmac
+import logging
 from datetime import datetime, timedelta
 from math import ceil
 from uuid import uuid4
@@ -9,17 +12,37 @@ from app.api.deps import get_current_user, require_cookie_csrf
 from app.core.config import settings
 from app.core.security import digest_otp, digest_token, generate_opaque_token, generate_otp, hash_password, verify_password
 from app.db.session import get_db
-from app.models import AuthSession, PasswordResetChallenge, User, UserSettings
-from app.schemas.auth import GoogleLoginRequest, LoginRequest, PasswordResetConfirm, PasswordResetRequest, PasswordResetVerify, SignupRequest
+from app.models import AuthSession, EmailVerificationChallenge, PasswordResetChallenge, User, UserSettings
+from app.schemas.auth import (
+    GoogleLoginRequest,
+    LoginRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    PasswordResetVerify,
+    SignupRequest,
+    SignupResendRequest,
+    SignupResponse,
+    SignupVerifyRequest,
+)
 from app.services.auth_service import authenticate_user, create_user, issue_session, public_user
 from app.services.demo_service import DEMO_USER, create_demo_workspace
-from app.services.email_service import DeliveryNotConfigured, send_email_otp
+from app.services.email_service import DeliveryNotConfigured, send_email_otp, send_email_otp_sync
 from app.services.sms_service import send_sms_otp
 from app.services.google_auth_service import GoogleCredentialError, verify_google_credential
 from app.services.rate_limit_service import clear_account_limit, enforce_rate_limit
 from app.core.time import utcnow_naive
 
+logger = logging.getLogger("blueharvest.auth")
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
+
+
+def secrets_compare(left: str, right: str) -> bool:
+    return hmac.compare_digest(left, right)
+
+
+def digest_signup_otp(email: str, code: str) -> str:
+    message = f"signup-verification:{email.lower().strip()}:{code.strip()}".encode("utf-8")
+    return hmac.new(settings.secret_key.encode("utf-8"), message, hashlib.sha256).hexdigest()
 
 
 def _find_user_by_destination(db: Session, destination: str) -> tuple[User | None, str, str]:
@@ -38,13 +61,221 @@ def _lock_recovery_user(db: Session, user_id: str) -> None:
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-def signup(body: SignupRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+def signup(body: SignupRequest, request: Request, response: Response = None, db: Session = Depends(get_db)):
     enforce_rate_limit(db, request, "signup", ip_limit=settings.signup_ip_limit, window_seconds=settings.signup_window_seconds)
-    user = create_user(
-        db, full_name=body.full_name, username=body.username, email=str(body.email), phone=body.phone,
-        pond_location=body.pond_location, password=body.password,
+    normalized_email = str(body.email).strip().lower()
+
+    existing = db.scalar(select(User).where(or_(User.username == body.username, User.email == normalized_email)))
+    if existing:
+        if existing.email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "user_already_exists", "message": "An account with this username or email already exists."},
+            )
+        # Unverified existing registration: update credentials and issue a fresh challenge
+        user = existing
+        user.full_name = body.full_name
+        user.pond_location = body.pond_location
+        user.phone = body.phone
+        user.password_hash = hash_password(body.password)
+    else:
+        user = create_user(
+            db,
+            full_name=body.full_name,
+            username=body.username,
+            email=normalized_email,
+            phone=body.phone,
+            pond_location=body.pond_location,
+            password=body.password,
+        )
+        user.email_verified = False
+
+    now = utcnow_naive()
+    # Invalidate previous unconsumed verification challenges
+    db.execute(
+        update(EmailVerificationChallenge)
+        .where(EmailVerificationChallenge.user_id == user.id, EmailVerificationChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
     )
+
+    code = generate_otp()
+    challenge = EmailVerificationChallenge(
+        id=str(uuid4()),
+        user_id=user.id,
+        email=normalized_email,
+        code_hash=digest_signup_otp(normalized_email, code),
+        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        attempt_count=0,
+    )
+    db.add(challenge)
+    db.commit()
+
+    development_code = None
+    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+        development_code = code
+    else:
+        try:
+            send_email_otp_sync(normalized_email, code, purpose="email verification")
+        except DeliveryNotConfigured as exc:
+            if settings.app_env.lower() in {"development", "dev", "test"}:
+                development_code = code
+            else:
+                db.rollback()
+                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification email delivery failed. Please check your email configuration."})
+
+    result = {
+        "verification_required": True,
+        "email": normalized_email,
+        "challenge_id": challenge.id,
+        "message": f"Verification code sent to {normalized_email}. Please enter the 6-digit code to complete registration.",
+    }
+    if development_code is not None:
+        result["otp"] = development_code
+    return result
+
+
+@router.post("/signup/verify")
+def verify_signup(body: SignupVerifyRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    normalized_email = body.email.strip().lower()
+    enforce_rate_limit(
+        db,
+        request,
+        "signup_verify",
+        ip_limit=settings.otp_ip_limit,
+        window_seconds=settings.otp_window_seconds,
+        account=f"signup_verify:{normalized_email}",
+        account_limit=settings.otp_account_limit,
+    )
+    user = db.scalar(select(User).where(User.email == normalized_email))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "user_not_found", "message": "No account found with this email."},
+        )
+
+    now = utcnow_naive()
+    challenge = db.scalar(
+        select(EmailVerificationChallenge)
+        .where(
+            EmailVerificationChallenge.user_id == user.id,
+            EmailVerificationChallenge.consumed_at.is_(None),
+            EmailVerificationChallenge.expires_at > now,
+        )
+        .order_by(EmailVerificationChallenge.created_at.desc())
+        .limit(1)
+        .execution_options(populate_existing=True)
+    )
+    if not challenge or challenge.verified_at is not None or challenge.attempt_count >= settings.otp_max_attempts:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "verification_code_invalid", "message": "The verification code is invalid or has expired. Please request a new code."},
+        )
+
+    challenge.attempt_count += 1
+    expected_hash = digest_signup_otp(normalized_email, body.code.strip())
+    if not secrets_compare(challenge.code_hash, expected_hash):
+        db.commit()
+        remaining = max(0, settings.otp_max_attempts - challenge.attempt_count)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "verification_code_invalid", "message": f"The verification code is invalid. {remaining} attempt(s) remaining."},
+        )
+
+    challenge.verified_at = now
+    challenge.consumed_at = now
+    user.email_verified = True
+    db.commit()
+    db.refresh(user)
+
     return issue_session(db, user, response)
+
+
+@router.post("/signup/resend")
+def resend_signup_otp(body: SignupResendRequest, request: Request, db: Session = Depends(get_db)):
+    normalized_email = body.email.strip().lower()
+    enforce_rate_limit(
+        db,
+        request,
+        "signup_resend",
+        ip_limit=settings.otp_ip_limit,
+        window_seconds=settings.otp_window_seconds,
+        account=f"signup_resend:{normalized_email}",
+        account_limit=settings.otp_account_limit,
+    )
+    user = db.scalar(select(User).where(User.email == normalized_email))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "user_not_found", "message": "No account found with this email."},
+        )
+    if user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "already_verified", "message": "This email is already verified. Please sign in."},
+        )
+
+    now = utcnow_naive()
+    # Enforce minimum 30s cooldown between resend attempts
+    last_challenge = db.scalar(
+        select(EmailVerificationChallenge)
+        .where(EmailVerificationChallenge.user_id == user.id)
+        .order_by(EmailVerificationChallenge.created_at.desc())
+        .limit(1)
+    )
+    if last_challenge and (now - last_challenge.created_at).total_seconds() < 30:
+        remaining = 30 - int((now - last_challenge.created_at).total_seconds())
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"code": "resend_cooldown", "message": f"Please wait {remaining} seconds before requesting a new code."},
+        )
+
+    db.execute(
+        update(EmailVerificationChallenge)
+        .where(EmailVerificationChallenge.user_id == user.id, EmailVerificationChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+    )
+
+    code = generate_otp()
+    challenge = EmailVerificationChallenge(
+        id=str(uuid4()),
+        user_id=user.id,
+        email=normalized_email,
+        code_hash=digest_signup_otp(normalized_email, code),
+        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        attempt_count=0,
+    )
+    db.add(challenge)
+    db.commit()
+
+    development_code = None
+    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+        development_code = code
+    else:
+        try:
+            send_email_otp_sync(normalized_email, code, purpose="email verification")
+        except DeliveryNotConfigured as exc:
+            if settings.app_env.lower() in {"development", "dev", "test"}:
+                development_code = code
+            else:
+                db.rollback()
+                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification code delivery failed. Check email provider configuration and try again."})
+
+    result = {
+        "verification_required": True,
+        "email": normalized_email,
+        "challenge_id": challenge.id,
+        "message": f"New verification code sent to {normalized_email}.",
+    }
+    if development_code is not None:
+        result["otp"] = development_code
+    return result
 
 
 @router.post("/login")
@@ -60,6 +291,15 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
     clear_account_limit(db, "login", account)
     if user.username == DEMO_USER["username"] and user.email == DEMO_USER["email"]:
         user = create_demo_workspace(db)
+    elif not user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "email_not_verified",
+                "message": "Please verify your email address before logging in.",
+                "email": user.email,
+            },
+        )
     return issue_session(db, user, response)
 
 
@@ -93,24 +333,29 @@ def google_login(body: GoogleLoginRequest, response: Response, db: Session = Dep
             candidate = base_username
             suffix = 1
             while db.scalar(select(User.id).where(User.username == candidate)):
-                candidate = f"{base_username[:44]}{suffix}"
+                candidate = f"{base_username[:35]}_{suffix}"
                 suffix += 1
             user = User(
-                id=str(uuid4()), username=candidate, full_name=str(claims.get("name") or local_part)[:120],
-                email=email, google_sub=str(subject), email_verified=True, display_role="Aquafarm Operator",
+                id=str(uuid4()),
+                username=candidate,
+                full_name=claims.get("name") or candidate,
+                email=email,
+                google_sub=str(subject),
+                pond_location="Unassigned Pond",
+                display_role="Aquafarm Operator",
+                email_verified=True,
             )
             user.settings = UserSettings(user_id=user.id)
             db.add(user)
             db.commit()
             db.refresh(user)
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail={"code": "account_disabled", "message": "This account is disabled."})
+
     return issue_session(db, user, response)
 
 
 @router.get("/me")
-def auth_me(user: User = Depends(get_current_user)):
-    return {"user": public_user(user)}
+def me(current_user: User = Depends(get_current_user)):
+    return {"user": public_user(current_user)}
 
 
 @router.post("/refresh", dependencies=[Depends(require_cookie_csrf)])
@@ -252,11 +497,6 @@ def password_reset_verify(body: PasswordResetVerify, request: Request, db: Sessi
     return {"ok": True, "reset_token": reset_token, "message": "Code verified. Choose a new password."}
 
 
-def secrets_compare(left: str, right: str) -> bool:
-    import hmac
-    return hmac.compare_digest(left, right)
-
-
 @router.post("/password-reset/confirm")
 def password_reset_confirm(body: PasswordResetConfirm, request: Request, db: Session = Depends(get_db)):
     user, destination, _ = _find_user_by_destination(db, body.destination)
@@ -295,3 +535,4 @@ def password_reset_confirm(body: PasswordResetConfirm, request: Request, db: Ses
     )
     db.commit()
     return {"ok": True, "message": "Password updated. Sign in with your new password."}
+

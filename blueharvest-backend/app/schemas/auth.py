@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+﻿from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.schemas.user import normalize_phone
 
 
@@ -16,6 +16,33 @@ class SignupRequest(BaseModel):
     @classmethod
     def strip_text(cls, value):
         return value.strip() if isinstance(value, str) else value
+
+
+class SignupVerifyRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6}$")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value):
+        return value.strip().lower() if isinstance(value, str) else value
+
+
+class SignupResendRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value):
+        return value.strip().lower() if isinstance(value, str) else value
+
+
+class SignupResponse(BaseModel):
+    verification_required: bool = True
+    email: str
+    challenge_id: str
+    message: str
+    otp: str | None = None
 
 
 class LoginRequest(BaseModel):

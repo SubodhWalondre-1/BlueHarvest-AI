@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+﻿from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from datetime import timedelta
 from io import BytesIO
@@ -63,7 +63,7 @@ def rate_db(tmp_path, monkeypatch):
         for index in (1, 2):
             db.add(User(
                 id=f"operator-{index}", username=f"operator_{index}", full_name="Test Operator",
-                email=f"operator{index}@example.com", phone=f"+91987654321{index}", password_hash=hashed,
+                email=f"operator{index}@example.com", phone=f"+91987654321{index}", password_hash=hashed, email_verified=True,
             ))
         db.commit()
         yield db, sessions, now
@@ -155,8 +155,8 @@ def test_signup_is_limited_before_account_creation(rate_db):
             pond_location="Test Pond", password=PASSWORD,
         ), request(), Response(), db)
 
-    assert signup(1)["access_token"]
-    assert signup(2)["access_token"]
+    assert signup(1).get("verification_required") or signup(1).get("access_token")
+    assert signup(2).get("verification_required") or signup(2).get("access_token")
     assert_rejected(429, lambda: signup(3))
     assert db.scalar(select(User.id).where(User.username == "new_operator_3")) is None
 
@@ -352,3 +352,4 @@ def test_inference_rate_limit_response_over_http(client, registered, monkeypatch
     assert int(response.headers["Retry-After"]) > 0
     assert calls == ["modal"]
     assert len(list(settings.uploads_path.iterdir())) == 1
+

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import LoginView from './components/LoginView';
 import SignUpView from './components/SignUpView';
 import HomePage from './components/HomePage';
 import ForgotPasswordModal from './components/ForgotPasswordModal';
+import DualFishLoader from './components/DualFishLoader';
 import { restoreAuthSession, logoutUser } from './api/client';
 import { applyTheme, setupSystemThemeListener, THEME_STORAGE_KEY } from './utils/theme';
 import './App.css';
@@ -60,6 +61,7 @@ export default function App() {
   const [route, setRoute] = useState(parseRouteFromLocation);
   // The server, not localStorage, is the source of truth for the active session.
   const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthResolving, setIsAuthResolving] = useState(true);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [notification, setNotification] = useState(null);
   const [autoTriggerCount, setAutoTriggerCount] = useState(route.countTrigger ? Date.now() : null);
@@ -68,6 +70,11 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const currentRoute = parseRouteFromLocation();
+      if (!isAuthResolving && !currentUser && currentRoute.screen === 'home') {
+        window.history.replaceState(null, '', '/login');
+        setRoute(parseRouteFromLocation());
+        return;
+      }
       setRoute(currentRoute);
       if (currentRoute.countTrigger) {
         setAutoTriggerCount(Date.now());
@@ -76,7 +83,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [isAuthResolving, currentUser]);
 
   // Initialize and track theme preference (Light, Dark OLED, or System Appearance)
   useEffect(() => {
@@ -98,6 +105,11 @@ export default function App() {
       }
     }
     const currentRoute = parseRouteFromLocation();
+    if (!isAuthResolving && !currentUser && currentRoute.screen === 'home') {
+      window.history.replaceState(null, '', '/login');
+      setRoute(parseRouteFromLocation());
+      return;
+    }
     setRoute(currentRoute);
     if (currentRoute.countTrigger) {
       setAutoTriggerCount(Date.now());
@@ -108,29 +120,94 @@ export default function App() {
   // localStorage user is display state only; it is not treated as authentication.
   useEffect(() => {
     let cancelled = false;
-    restoreAuthSession().then((verifiedUser) => {
-      if (cancelled) return;
-      if (verifiedUser) {
-        setCurrentUser(verifiedUser);
-        try { localStorage.setItem('blueharvest_user', JSON.stringify(verifiedUser)); } catch { /* storage optional */ }
-        if (window.location.pathname === '/' || window.location.pathname === '') {
-          window.history.replaceState(null, '', '/home');
-          setRoute(parseRouteFromLocation());
+    restoreAuthSession()
+      .then((verifiedUser) => {
+        if (cancelled) return;
+        if (verifiedUser) {
+          setCurrentUser(verifiedUser);
+          try {
+            localStorage.setItem('blueharvest_user', JSON.stringify(verifiedUser));
+          } catch {
+            /* storage optional */
+          }
+          if (window.location.pathname === '/' || window.location.pathname === '') {
+            window.history.replaceState(null, '', '/home');
+            setRoute(parseRouteFromLocation());
+          }
+        } else {
+          setCurrentUser(null);
+          try {
+            localStorage.removeItem('blueharvest_user');
+          } catch {
+            /* storage optional */
+          }
+          const currentRoute = parseRouteFromLocation();
+          if (currentRoute.screen === 'home') {
+            window.history.replaceState(null, '', '/login');
+            setRoute(parseRouteFromLocation());
+          }
         }
-      } else {
+      })
+      .catch(() => {
+        if (cancelled) return;
         setCurrentUser(null);
-        try { localStorage.removeItem('blueharvest_user'); } catch { /* storage optional */ }
+        try {
+          localStorage.removeItem('blueharvest_user');
+        } catch {
+          /* storage optional */
+        }
         const currentRoute = parseRouteFromLocation();
         if (currentRoute.screen === 'home') {
           window.history.replaceState(null, '', '/login');
           setRoute(parseRouteFromLocation());
         }
-      }
-    }).catch(() => {
-      // Keep the login page usable when the local backend is not running yet.
-    });
-    return () => { cancelled = true; };
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsAuthResolving(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // 10-Minute Inactivity Auto-Logout (idle tracker)
+  const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let timeoutId;
+    const performInactivityLogout = () => {
+      handleLogout();
+      setNotification('Session expired due to 10 minutes of inactivity. Please log in again.');
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(performInactivityLogout, INACTIVITY_TIMEOUT_MS);
+    };
+
+    resetTimer();
+
+    let lastActivity = Date.now();
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastActivity > 5000) {
+        lastActivity = now;
+        resetTimer();
+      }
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, handleActivity, { passive: true }));
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach((evt) => window.removeEventListener(evt, handleActivity));
+    };
+  }, [currentUser]);
 
   const handleLoginSuccess = (userData) => {
     setCurrentUser(userData);
@@ -152,12 +229,16 @@ export default function App() {
       // ignore storage error
     }
     navigateTo('/home');
-    setNotification(`Account created for ${userData.username}!`);
+    setNotification(`Account verified and created for ${userData.username}!`);
     setTimeout(() => setNotification(null), 3000);
   };
 
   const handleLogout = async () => {
-    try { await logoutUser(); } catch { /* clear local state even if API is unavailable */ }
+    try {
+      await logoutUser();
+    } catch {
+      /* clear local state even if API is unavailable */
+    }
     setCurrentUser(null);
     try {
       localStorage.removeItem('blueharvest_user');
@@ -179,7 +260,7 @@ export default function App() {
     <div className={`app-viewport-wrapper screen-${route.screen}`}>
       <div className={`app-mobile-container mode-${route.screen}`}>
         {route.screen === 'login' && (
-          <LoginView 
+          <LoginView
             onLoginSuccess={handleLoginSuccess}
             onSwitchToSignUp={() => navigateTo('/signup')}
             onForgotPassword={() => setShowForgotModal(true)}
@@ -187,20 +268,34 @@ export default function App() {
         )}
 
         {route.screen === 'signup' && (
-          <SignUpView 
+          <SignUpView
             onSignUpSuccess={handleSignUpSuccess}
             onSwitchToLogin={() => navigateTo('/login')}
           />
         )}
 
-        {route.screen === 'home' && (
-          <HomePage 
-            user={currentUser} 
+        {route.screen === 'home' && isAuthResolving && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '380px', padding: '40px 20px' }}>
+            <DualFishLoader message="Securing session…" />
+          </div>
+        )}
+
+        {route.screen === 'home' && !isAuthResolving && currentUser && (
+          <HomePage
+            user={currentUser}
             activeTab={route.tab}
             onTabChange={handleTabChange}
             onCountRequested={handleCountRequested}
             autoTriggerCount={autoTriggerCount}
-            onLogout={handleLogout} 
+            onLogout={handleLogout}
+          />
+        )}
+
+        {route.screen === 'home' && !isAuthResolving && !currentUser && (
+          <LoginView
+            onLoginSuccess={handleLoginSuccess}
+            onSwitchToSignUp={() => navigateTo('/signup')}
+            onForgotPassword={() => setShowForgotModal(true)}
           />
         )}
 
@@ -211,7 +306,7 @@ export default function App() {
         )}
       </div>
 
-      <ForgotPasswordModal 
+      <ForgotPasswordModal
         isOpen={showForgotModal}
         onClose={() => setShowForgotModal(false)}
       />

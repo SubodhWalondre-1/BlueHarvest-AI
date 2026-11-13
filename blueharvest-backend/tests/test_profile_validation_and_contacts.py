@@ -1,4 +1,4 @@
-from datetime import timedelta
+﻿from datetime import timedelta
 from uuid import uuid4
 
 import pytest
@@ -146,8 +146,13 @@ def test_resend_invalidates_old_challenge_and_only_latest_can_apply(client, regi
 
 def test_challenge_is_bound_to_owner_and_target_cannot_be_overridden(client, registered):
     challenge = request_change(client, registered).json()
-    other = client.post("/api/auth/signup", json={"full_name": "Other Operator", "username": "other_contact",
+    other_resp = client.post("/api/auth/signup", json={"full_name": "Other Operator", "username": "other_contact",
         "email": "other@example.com", "pond_location": "Other Pond", "password": PASSWORD}).json()
+    if other_resp.get("verification_required"):
+        other_verify = client.post("/api/auth/signup/verify", json={"email": "other@example.com", "code": other_resp["otp"]})
+        other = other_verify.json()
+    else:
+        other = other_resp
     result = confirm(client, {"token": other["access_token"]}, challenge)
     assert result.status_code == 400
     override = client.post("/api/users/me/contact-change/confirm", headers=headers(registered), json={
@@ -286,3 +291,4 @@ def test_contact_confirmation_is_single_use_under_concurrency(tmp_path):
             assert db.get(User, "contact-owner").email == "new@example.com"
     finally:
         engine.dispose()
+

@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import smtplib
 from email.message import EmailMessage
 from app.core.config import settings
@@ -8,7 +8,7 @@ class DeliveryNotConfigured(RuntimeError):
     pass
 
 
-def _send_email_sync(destination: str, code: str, purpose: str = "password recovery") -> None:
+def send_email_otp_sync(destination: str, code: str, purpose: str = "password recovery") -> None:
     if not all([settings.smtp_host, settings.smtp_from_email]):
         raise DeliveryNotConfigured("Email delivery is not configured. Set SMTP_HOST and SMTP_FROM_EMAIL.")
     msg = EmailMessage()
@@ -30,4 +30,4 @@ def _send_email_sync(destination: str, code: str, purpose: str = "password recov
 
 
 async def send_email_otp(destination: str, code: str, purpose: str = "password recovery") -> None:
-    await asyncio.to_thread(_send_email_sync, destination, code, purpose)
+    await asyncio.to_thread(send_email_otp_sync, destination, code, purpose)

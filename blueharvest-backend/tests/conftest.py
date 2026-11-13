@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -33,6 +33,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "dev_expose_otp", True)
     monkeypatch.setattr(settings, "modal_enabled", False)
     monkeypatch.setattr(settings, "demo_mode_enabled", False)
+    monkeypatch.setattr(settings, "retain_all_uploads", False)
     for key in ("cloudinary_url", "cloudinary_cloud_name", "cloudinary_api_key", "cloudinary_api_secret"):
         monkeypatch.setattr(settings, key, None)
     monkeypatch.setattr(settings, "upload_dir", str(tmp_path / "uploads"))
@@ -55,4 +56,11 @@ def registered(client):
     })
     assert response.status_code == 201, response.text
     body = response.json()
+    if body.get("verification_required"):
+        verify_resp = client.post("/api/auth/signup/verify", json={
+            "email": body["email"],
+            "code": body["otp"],
+        })
+        assert verify_resp.status_code == 200, verify_resp.text
+        body = verify_resp.json()
     return {"user": body["user"], "token": body["access_token"]}

@@ -1,4 +1,4 @@
-from io import BytesIO
+﻿from io import BytesIO
 from PIL import Image
 import pytest
 from sqlalchemy import select
@@ -98,7 +98,7 @@ def test_clients_cannot_submit_demo_counts(client, registered, monkeypatch):
     monkeypatch.setattr(settings, "demo_mode_enabled", True)
     headers = {"Authorization": f"Bearer {registered['token']}"}
     response = client.post("/api/count-sessions", headers=headers, json={
-        "count": 999999, "is_demo": True, "method": "DEMO DATA — SAMPLE ONLY"
+        "count": 999999, "is_demo": True, "method": "DEMO DATA â€” SAMPLE ONLY"
     })
     assert response.status_code == 422
 
@@ -115,7 +115,15 @@ def test_count_session_is_not_visible_to_another_user(client, registered, infer)
         "password": "SafeOtherPass!123",
     })
     assert signup.status_code == 201, signup.text
-    other_headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    signup_data = signup.json()
+    if signup_data.get("verification_required"):
+        verify_resp = client.post("/api/auth/signup/verify", json={
+            "email": signup_data["email"],
+            "code": signup_data["otp"],
+        })
+        assert verify_resp.status_code == 200
+        signup_data = verify_resp.json()
+    other_headers = {"Authorization": f"Bearer {signup_data['access_token']}"}
     response = client.get(f"/api/count-sessions/{session_id}", headers=other_headers)
     assert response.status_code == 404
     saved = client.post("/api/count-sessions", headers=other_headers, json={"session_id": session_id})
@@ -290,3 +298,4 @@ def test_invalid_source_does_not_start_inference(client, registered, infer):
     response = infer(source="Forged")
     assert response.status_code == 422
     assert not list(settings.uploads_path.iterdir())
+
