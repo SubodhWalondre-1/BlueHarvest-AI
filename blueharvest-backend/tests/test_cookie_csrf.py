@@ -144,7 +144,7 @@ def test_cors_preflight_rejects_untrusted_origins(client, origin):
 
 @pytest.mark.parametrize("value", [
     "", " , ", "*", "null", "https://*.example.com", "https://.*example.com",
-    "example.com", "//example.com", "ftp://example.com", "https://example.com/",
+    "example.com", "//example.com", "ftp://example.com",
     "https://example.com/path", "https://example.com?query=1", "https://example.com#fragment",
     "https://user@example.com", "https://user:password@example.com", "https://example.com:invalid",
     "https://example.com:99999", "https://example.com\\attacker", "https://exam ple.com",
@@ -156,5 +156,5 @@ def test_cors_configuration_rejects_non_origins_and_wildcards(value):
 
 
 def test_cors_configuration_accepts_exact_origins_and_trims_csv_whitespace():
-    config = Settings(cors_origins=" https://app.example.com, http://localhost:5173,http://127.0.0.1:5173,http://[::1]:5173 ", _env_file=None)
+    config = Settings(cors_origins=" https://app.example.com/, http://localhost:5173,http://127.0.0.1:5173,http://[::1]:5173 ", _env_file=None)
     assert config.allowed_origins == ["https://app.example.com", "http://localhost:5173", "http://127.0.0.1:5173", "http://[::1]:5173"]

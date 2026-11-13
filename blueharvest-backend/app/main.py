@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+import logging
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 from app.core.config import settings
 from app.api.routes import auth, count_sessions, dashboard, diagnostics, image_processing, notifications, users
 from app.api.deps import CSRF_HEADER
@@ -10,6 +12,8 @@ from app.services.demo_service import seed_demo_data
 from app.services.inference_resource_service import cleanup_expired_inference_jobs
 from app.services.storage_service import secure_legacy_images
 from starlette.concurrency import run_in_threadpool
+
+logger = logging.getLogger("app.main")
 
 if settings.sentry_dsn and settings.app_env.lower() != "test":
     try:
@@ -42,12 +46,52 @@ if settings.sentry_dsn and settings.app_env.lower() != "test":
         pass
 
 
+class ServerErrorCatcherMiddleware:
+    """Catches unhandled server exceptions inside the CORS boundary, logs them,
+    captures to Sentry (if configured), and returns a clean 500 JSON response with CORS headers.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        response_started = False
+
+        async def send_wrapper(message):
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception as exc:
+            logger.exception("Unhandled server error: %s", exc)
+            if settings.sentry_dsn:
+                try:
+                    import sentry_sdk
+                    sentry_sdk.capture_exception(exc)
+                except Exception:
+                    pass
+            if not response_started:
+                response = JSONResponse(
+                    status_code=500,
+                    content={"code": "internal_error", "message": "An unexpected server error occurred."},
+                )
+                await response(scope, receive, send)
+            raise exc
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Schema changes are managed exclusively through Alembic migrations.
     # Do not call create_all() here: it can create tables before the Alembic
     # version table exists and make a later `alembic upgrade head` fail.
+    logger.info("CORS effective allowed origins: %s", settings.allowed_origins)
     _app.state.http_client = httpx.AsyncClient(
         timeout=settings.modal_timeout_seconds,
         limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
@@ -79,13 +123,19 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Inner middleware: Catches unhandled exceptions inside the CORS boundary
+app.add_middleware(ServerErrorCatcherMiddleware)
+
+# Outermost middleware: Handles CORS and preflight OPTIONS requests before any inner layer
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", CSRF_HEADER],
     expose_headers=["Retry-After"],
+    max_age=600,
 )
 
 app.include_router(auth.router)

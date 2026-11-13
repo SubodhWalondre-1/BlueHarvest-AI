@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
-from pydantic import Field, field_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     refresh_cookie_name: str = "bh_refresh"
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str | None = None
     database_url: str = "sqlite:///./data/blueharvest.db"
     upload_dir: str = "./data/uploads"
     upload_storage_persistent: bool = False
@@ -82,22 +82,58 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @field_validator("cors_origins")
-    @classmethod
-    def validate_cors_origins(cls, value: str) -> str:
-        origins = [origin.strip() for origin in value.split(",") if origin.strip()]
-        if not origins:
-            raise ValueError("CORS_ORIGINS must contain exact frontend origins.")
-        for origin in origins:
-            parsed = urlsplit(origin)
-            if (parsed.scheme not in {"http", "https"} or not parsed.hostname
-                    or parsed.username is not None or parsed.password is not None
-                    or parsed.path or parsed.query or parsed.fragment
-                    or "*" in origin or "\\" in origin or any(char.isspace() for char in origin)):
-                raise ValueError("CORS_ORIGINS must contain exact HTTP(S) origins without wildcards, credentials, paths, queries, or fragments.")
+    @model_validator(mode="after")
+    def validate_environment_and_cors(self) -> "Settings":
+        is_prod = self.app_env.lower() in {"production", "prod"}
+        raw = self.cors_origins
+        if raw is None:
+            if is_prod:
+                raise RuntimeError("CORS_ORIGINS environment variable must be explicitly configured with exact origins in production.")
+            raw = "http://localhost:5173,http://127.0.0.1:5173"
+
+        origins = []
+        for item in str(raw).split(","):
+            entry = item.strip().rstrip("/")
+            if not entry:
+                continue
+            if "*" in entry:
+                raise ValueError("CORS_ORIGINS cannot contain wildcards (*) when credentials are enabled.")
+            parsed = urlsplit(entry)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.hostname
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+                or "\\" in entry
+                or any(char.isspace() for char in entry)
+            ):
+                raise ValueError(
+                    f"Invalid CORS origin '{entry}': must be exact HTTP(S) origin without wildcards, credentials, paths, queries, or fragments."
+                )
             # Accessing port also rejects malformed and out-of-range port values.
             parsed.port
-        return ",".join(origins)
+            origins.append(entry)
+
+        if not origins:
+            if is_prod:
+                raise RuntimeError("CORS_ORIGINS must contain valid frontend origins in production.")
+            raise ValueError("CORS_ORIGINS must contain exact frontend origins.")
+
+        self.cors_origins = ",".join(origins)
+
+        if is_prod:
+            placeholder_markers = ("dev-only-", "replace-this", "change-me", "changeme")
+            if len(self.secret_key) < 32 or any(marker in self.secret_key.lower() for marker in placeholder_markers):
+                raise RuntimeError("Set SECRET_KEY to a unique random value of at least 32 characters before production deployment")
+            if self.cookie_samesite.lower() not in {"lax", "strict", "none"}:
+                raise RuntimeError("COOKIE_SAMESITE must be lax, strict, or none")
+            if self.cookie_samesite.lower() == "none" and not self.cookie_secure:
+                raise RuntimeError("COOKIE_SECURE=true is required when COOKIE_SAMESITE=none")
+
+        return self
 
     @property
     def modal_is_configured(self) -> bool:
@@ -126,6 +162,8 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins(self) -> list[str]:
+        if not self.cors_origins:
+            return []
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
@@ -139,12 +177,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-
-if settings.app_env.lower() in {"production", "prod"}:
-    placeholder_markers = ("dev-only-", "replace-this", "change-me", "changeme")
-    if len(settings.secret_key) < 32 or any(marker in settings.secret_key.lower() for marker in placeholder_markers):
-        raise RuntimeError("Set SECRET_KEY to a unique random value of at least 32 characters before production deployment")
-    if settings.cookie_samesite.lower() not in {"lax", "strict", "none"}:
-        raise RuntimeError("COOKIE_SAMESITE must be lax, strict, or none")
-    if settings.cookie_samesite.lower() == "none" and not settings.cookie_secure:
-        raise RuntimeError("COOKIE_SECURE=true is required when COOKIE_SAMESITE=none")

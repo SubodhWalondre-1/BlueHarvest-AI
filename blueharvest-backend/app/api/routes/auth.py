@@ -121,7 +121,12 @@ def refresh_session(request: Request, response: Response, db: Session = Depends(
     current = db.scalar(select(AuthSession).where(AuthSession.token_hash == digest_token(raw)))
     now = utcnow_naive()
     if not current or current.revoked_at or current.expires_at <= now or not current.user or not current.user.is_active:
-        response.delete_cookie(settings.refresh_cookie_name, path="/api/auth")
+        response.delete_cookie(
+            settings.refresh_cookie_name,
+            path="/api/auth",
+            secure=settings.cookie_secure,
+            samesite=settings.cookie_samesite.lower(),
+        )
         raise HTTPException(status_code=401, detail={"code": "refresh_invalid", "message": "Refresh session expired. Sign in again."})
     current.revoked_at = now
     db.commit()
@@ -136,7 +141,12 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
         if current and current.revoked_at is None:
             current.revoked_at = utcnow_naive()
             db.commit()
-    response.delete_cookie(settings.refresh_cookie_name, path="/api/auth")
+    response.delete_cookie(
+        settings.refresh_cookie_name,
+        path="/api/auth",
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite.lower(),
+    )
     return {"ok": True}
 
 

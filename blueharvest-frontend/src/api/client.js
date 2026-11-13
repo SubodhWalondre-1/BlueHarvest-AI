@@ -12,7 +12,7 @@ const CSRF_HEADERS = { 'X-CSRF-Protection': '1' };
 let accessToken = null;
 
 export const getApiBaseUrl = () => {
-  const envUrl = import.meta.env?.VITE_API_URL;
+  const envUrl = import.meta.env?.VITE_API_URL || import.meta.env?.VITE_API_BASE_URL;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
     const trimmed = envUrl.trim().replace(/\/+$/, '');
     if (typeof window !== 'undefined') {
@@ -30,6 +30,9 @@ export const getApiBaseUrl = () => {
       }
     }
     return trimmed;
+  }
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return 'https://blueharvest-api.onrender.com';
   }
   const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
   return `http://${host || 'localhost'}:8000`;

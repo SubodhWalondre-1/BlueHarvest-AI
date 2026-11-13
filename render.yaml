@@ -23,7 +23,7 @@ services:
       - key: COOKIE_SAMESITE
         value: "none"
       - key: CORS_ORIGINS
-        value: "http://localhost:5173,https://blueharvest.netlify.app,https://blueharvest-ai.netlify.app"
+        value: "https://blueharvest-ai.netlify.app"
       - key: UPLOAD_DIR
         value: "/tmp/uploads"
       - key: UPLOAD_STORAGE_PERSISTENT
