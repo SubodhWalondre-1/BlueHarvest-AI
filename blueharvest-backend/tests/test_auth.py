@@ -45,3 +45,39 @@ def test_google_login_is_explicitly_disabled_without_client_id(client, monkeypat
     response = client.post("/api/auth/google", json={"credential": "placeholder-google-credential-value"})
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "google_oauth_not_configured"
+
+
+def test_google_login_success_creates_user_and_issues_session(client, monkeypatch):
+    from app.api.routes import auth as auth_route
+
+    def mock_verify(_credential):
+        return {
+            "sub": "google-test-sub-12345",
+            "email": "google_user@example.com",
+            "email_verified": True,
+            "name": "Google Test User",
+        }
+
+    monkeypatch.setattr(auth_route, "verify_google_credential", mock_verify)
+    response = client.post("/api/auth/google", json={"credential": "mock-valid-google-jwt-credential"})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["access_token"]
+    assert data["user"]["email"] == "google_user@example.com"
+    assert data["user"]["username"] == "google_user"
+
+
+def test_google_login_rejects_unverified_google_email(client, monkeypatch):
+    from app.api.routes import auth as auth_route
+
+    def mock_verify(_credential):
+        return {
+            "sub": "google-test-sub-67890",
+            "email": "unverified@example.com",
+            "email_verified": False,
+        }
+
+    monkeypatch.setattr(auth_route, "verify_google_credential", mock_verify)
+    response = client.post("/api/auth/google", json={"credential": "mock-unverified-credential"})
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "unverified_google_email"

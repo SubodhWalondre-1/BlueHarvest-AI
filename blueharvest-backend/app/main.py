@@ -1,4 +1,4 @@
-from contextlib import asynccontextmanager
+﻿from contextlib import asynccontextmanager
 import logging
 import httpx
 from fastapi import FastAPI
@@ -15,7 +15,15 @@ from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger("app.main")
 
-if settings.sentry_dsn and settings.app_env.lower() != "test":
+import os
+import sys
+
+if (
+    settings.sentry_dsn
+    and settings.app_env.lower() != "test"
+    and "pytest" not in sys.modules
+    and not os.environ.get("PYTEST_CURRENT_TEST")
+):
     try:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -23,6 +31,21 @@ if settings.sentry_dsn and settings.app_env.lower() != "test":
 
         def _scrub_sentry_event(event, hint):
             request = event.get("request", {})
+            url = str(request.get("url", ""))
+            # Do not forward test client calls or test environment traffic to Sentry
+            if "testserver" in url or "pytest" in sys.modules:
+                return None
+
+            # Filter out expected HTTP client and feature-disabled exceptions (e.g. 4xx, 503)
+            if "exc_info" in hint and hint["exc_info"]:
+                _, exc_value, _ = hint["exc_info"]
+                if isinstance(exc_value, HTTPException):
+                    if exc_value.status_code < 500 or exc_value.status_code == 503:
+                        return None
+                exc_name = type(exc_value).__name__
+                if exc_name in ("GoogleCredentialError",):
+                    return None
+
             headers = request.get("headers", {})
             for key in list(headers.keys()):
                 if key.lower() in {"authorization", "cookie", "set-cookie", "x-csrf-token"}:
@@ -71,7 +94,11 @@ class ServerErrorCatcherMiddleware:
             await self.app(scope, receive, send_wrapper)
         except Exception as exc:
             logger.exception("Unhandled server error: %s", exc)
-            if settings.sentry_dsn:
+            if (
+                settings.sentry_dsn
+                and "pytest" not in sys.modules
+                and not os.environ.get("PYTEST_CURRENT_TEST")
+            ):
                 try:
                     import sentry_sdk
                     sentry_sdk.capture_exception(exc)
@@ -150,3 +177,4 @@ app.include_router(diagnostics.router)
 @app.get("/")
 def root():
     return {"service": settings.app_name, "status": "running", "docs": "/docs"}
+
