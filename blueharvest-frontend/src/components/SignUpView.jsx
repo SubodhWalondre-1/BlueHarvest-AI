@@ -288,7 +288,7 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
                     id="reg-fullname"
                     type="text"
                     className="neumorphic-input"
-                    placeholder="e.g. Samarth Rao"
+                    placeholder="e.g. Rahul Sharma"
                     value={formData.fullName}
                     onChange={(e) => handleChange('fullName', e.target.value)}
                   />
@@ -305,7 +305,7 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
                     type="text"
                     autoComplete="username"
                     className="neumorphic-input"
-                    placeholder="e.g. samarth_farm"
+                    placeholder="e.g. coastal_aquafarm"
                     value={formData.username}
                     onChange={(e) => handleChange('username', e.target.value)}
                   />

@@ -939,7 +939,7 @@ export default function HomePage({
             <div className="profile-modal-avatar">
               <User size={30} className="header-action-icon" />
             </div>
-            <h3 className="profile-modal-name">{user?.username || 'samarth_aquafarm'}</h3>
+            <h3 className="profile-modal-name">{user?.username || 'Hatchery Operator'}</h3>
             <span className="profile-modal-role">{user?.role || 'Hatchery Operator'}</span>
             <div className="profile-modal-info">
               <div><strong>Pond:</strong> {user?.pondLocation || 'Pond Delta #4'}</div>

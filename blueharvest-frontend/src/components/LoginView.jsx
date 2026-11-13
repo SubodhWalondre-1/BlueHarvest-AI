@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
-import { getDiagnostics, loginUser, loginWithGoogleCredential } from '../api/client';
+import { loginUser, loginWithGoogleCredential } from '../api/client';
 
 const DEFAULT_GOOGLE_CLIENT_ID = '537540751411-6b4bomsui4f4co6ki1jq1m1vt4pt41na.apps.googleusercontent.com';
 
@@ -33,15 +33,8 @@ export default function LoginView({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [authError, setAuthError] = useState('');
-  const [demoAvailable, setDemoAvailable] = useState(false);
   const [googleLoadFailed, setGoogleLoadFailed] = useState(false);
   const googleBtnContainerRef = useRef(null);
-
-  useEffect(() => {
-    let active = true;
-    getDiagnostics().then((data) => { if (active) setDemoAvailable(Boolean(data.demo_mode?.enabled)); }).catch(() => {});
-    return () => { active = false; };
-  }, []);
 
   // Initialize Google Identity Services and mount the official button in an isolated DOM container
   useEffect(() => {
@@ -165,15 +158,7 @@ export default function LoginView({
     }
   };
 
-  const [isDemoFilled, setIsDemoFilled] = useState(false);
 
-  const handleFillDemo = () => {
-    setUsername('samarth_aquafarm');
-    setPassword('SpawnCounter2026!');
-    setErrors({ username: '', password: '' });
-    setIsDemoFilled(true);
-    setTimeout(() => setIsDemoFilled(false), 2500);
-  };
 
   return (
     <div className="login-screen-wrapper">
@@ -230,19 +215,8 @@ export default function LoginView({
       </div>
 
       <div className="login-content-container">
-        {/* Temporary Demo Credentials Tab in Top Right */}
-        {demoAvailable && <button
-          type="button"
-          className={`demo-credentials-tab ${isDemoFilled ? 'filled' : ''}`}
-          onClick={handleFillDemo}
-          title="Auto-fill Demo Credentials (samarth_aquafarm / SpawnCounter2026!)"
-          aria-label="Auto-fill demo credentials"
-        >
-          <span className="demo-tab-icon">{isDemoFilled ? '✓' : '⚡'}</span>
-          <span className="demo-tab-text">{isDemoFilled ? 'Filled!' : 'Demo'}</span>
-        </button>}
 
-        {/* Blue Harvest Logo Badge */}
+{/* Blue Harvest Logo Badge */}
         <div className="app-logo-badge" aria-label="Blue Harvest Logo">
           <svg 
             className="fish-swim-icon"

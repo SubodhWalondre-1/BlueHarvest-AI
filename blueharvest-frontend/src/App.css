@@ -196,47 +196,7 @@ body::-webkit-scrollbar,
   padding: clamp(24px, 4vh, 40px) 24px 34px;
 }
 
-/* Temporary Demo Credentials Tab (Top-Right Placement) */
-.demo-credentials-tab {
-  position: absolute;
-  top: clamp(18px, 3vh, 28px);
-  right: clamp(18px, 4vw, 24px);
-  z-index: 20;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #FFFFFF;
-  border: 1.5px solid #C8DCFA;
-  color: var(--blue);
-  padding: 6px 13px;
-  border-radius: 20px;
-  font: 800 12.5px 'Nunito', system-ui, sans-serif;
-  cursor: pointer;
-  box-shadow: 0 3px 10px rgba(47, 107, 255, 0.12);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
 
-.demo-credentials-tab:hover {
-  background: #EDF4FF;
-  border-color: var(--blue);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(47, 107, 255, 0.22);
-}
-
-.demo-credentials-tab:active {
-  transform: scale(0.95);
-}
-
-.demo-credentials-tab.filled {
-  background: #ECFDF5;
-  border-color: #10B981;
-  color: #059669;
-  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.2);
-}
-
-.demo-tab-icon {
-  font-size: 13px;
-}
 
 /* Circular Blue Logo Badge with White Fish */
 .app-logo-badge {
@@ -736,14 +696,7 @@ body::-webkit-scrollbar,
     padding: clamp(16px, 3vh, 24px) 20px 24px;
   }
 
-  /* Demo Credentials Tab on Mobile */
-  .demo-credentials-tab {
-    top: 14px;
-    right: 16px;
-    padding: 4px 10px;
-    font-size: 11px;
-    border-radius: 16px;
-  }
+
 
   /* App Logo Badge */
   .app-logo-badge {
