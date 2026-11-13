@@ -34,7 +34,7 @@ export default function LoginView({
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [authError, setAuthError] = useState('');
   const [demoAvailable, setDemoAvailable] = useState(false);
-  const [googleNativeMounted, setGoogleNativeMounted] = useState(false);
+  const [googleLoadFailed, setGoogleLoadFailed] = useState(false);
   const googleBtnContainerRef = useRef(null);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function LoginView({
     return () => { active = false; };
   }, []);
 
-  // Initialize Google Identity Services and mount native button
+  // Initialize Google Identity Services and mount the official button in an isolated DOM container
   useEffect(() => {
     let active = true;
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
@@ -71,19 +71,22 @@ export default function LoginView({
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
                        document.documentElement.classList.contains('dark-theme');
 
-        window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
-          theme: isDark ? 'filled_black' : 'outline',
-          size: 'large',
-          type: 'standard',
-          shape: 'pill',
-          text: 'continue_with',
-          logo_alignment: 'left',
-          width: 320,
-        });
-        setGoogleNativeMounted(true);
+        if (googleBtnContainerRef.current) {
+          googleBtnContainerRef.current.innerHTML = '';
+          window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
+            theme: isDark ? 'filled_black' : 'outline',
+            size: 'large',
+            type: 'standard',
+            shape: 'pill',
+            text: 'continue_with',
+            logo_alignment: 'left',
+            width: 320,
+          });
+        }
       })
       .catch((err) => {
         console.warn('Google Identity script load error:', err);
+        if (active) setGoogleLoadFailed(true);
       });
 
     return () => { active = false; };
@@ -361,26 +364,31 @@ export default function LoginView({
           </div>
         )}
 
-        {/* Continue with Google: Native button mount with styled fallback */}
-        <div className="google-native-btn-container" ref={googleBtnContainerRef}>
-          {!googleNativeMounted && (
-            <button
-              type="button"
-              className="action-btn google-login-btn"
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-            >
-              {/* Authentic Google Multi-color G */}
-              <svg className="google-icon" width="22" height="22" viewBox="0 0 48 48">
-                <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/>
-                <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/>
-                <path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/>
-                <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/>
-              </svg>
-              <span className="google-btn-text">Continue with Google</span>
-            </button>
-          )}
-        </div>
+        {/* Continue with Google */}
+        {googleLoadFailed && (
+          <button
+            type="button"
+            className="action-btn google-login-btn"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+          >
+            {/* Authentic Google Multi-color G */}
+            <svg className="google-icon" width="22" height="22" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/>
+              <path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/>
+              <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/>
+            </svg>
+            <span className="google-btn-text">Continue with Google</span>
+          </button>
+        )}
+
+        {/* Dedicated isolated Google Identity Services container: React virtual DOM leaves children untouched */}
+        <div 
+          ref={googleBtnContainerRef} 
+          className="google-native-btn-container"
+          style={{ display: googleLoadFailed ? 'none' : 'flex' }}
+        />
 
         {/* Bottom Section Resting on Wave */}
         <div className="bottom-wave-section">
