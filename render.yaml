@@ -13,9 +13,8 @@ services:
       - key: APP_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: blueharvest-db
-          property: connectionString
+        # Set to your permanent CockroachDB Cloud connection string (blueharvest_prod)
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: COOKIE_SECURE
@@ -63,8 +62,3 @@ services:
       - key: RETAIN_ALL_UPLOADS
         value: "true"
 
-databases:
-  - name: blueharvest-db
-    databaseName: blueharvest
-    user: blueharvest_user
-    plan: free
