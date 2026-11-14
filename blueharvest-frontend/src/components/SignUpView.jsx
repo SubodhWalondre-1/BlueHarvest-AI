@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, Loader2, ArrowLeft, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ArrowLeft, AlertCircle, CheckCircle2, Mail, Smartphone } from 'lucide-react';
 import { signupUser, verifySignupOtp, resendSignupOtp } from '../api/client';
 
 export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
@@ -20,6 +20,8 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
   const [isOtpStep, setIsOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [registeredDestination, setRegisteredDestination] = useState('');
+  const [verificationChannel, setVerificationChannel] = useState('sms');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -59,6 +61,12 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
     if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       newErrors.email = 'A valid email address is required';
     }
+    const trimmedPhone = formData.phone.trim();
+    if (!trimmedPhone) {
+      newErrors.phone = 'Mobile phone number is required for SMS verification';
+    } else if (!/^\+?[0-9\s-]{10,15}$/.test(trimmedPhone)) {
+      newErrors.phone = 'Please enter a valid 10-digit mobile number';
+    }
     if (!formData.pondLocation.trim()) newErrors.pondLocation = 'Hatchery/Pond location is required';
     if (!formData.password) newErrors.password = 'Password is required';
     if (formData.password && formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
@@ -74,10 +82,19 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
     try {
       const result = await signupUser(formData);
       if (result?.verification_required) {
+        const dest = result.destination || result.phone || formData.phone.trim();
+        const chan = result.channel || 'sms';
+        setRegisteredDestination(dest);
         setRegisteredEmail(result.email || formData.email.trim().toLowerCase());
+        setVerificationChannel(chan);
         setIsOtpStep(true);
         setResendCooldown(60);
-        setInfoMessage(result.message || `We sent a 6-digit verification code to ${result.email || formData.email.trim()}.`);
+        setInfoMessage(
+          result.message ||
+          (chan === 'sms'
+            ? `We sent a 6-digit verification code via SMS to ${dest}.`
+            : `We sent a 6-digit verification code to ${dest}.`)
+        );
       } else if (result?.user) {
         onSignUpSuccess?.(result.user);
       }
@@ -104,7 +121,11 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
     setIsVerifying(true);
     setErrors({});
     try {
-      const result = await verifySignupOtp({ email: registeredEmail, code: cleanedCode });
+      const result = await verifySignupOtp({
+        destination: registeredDestination || registeredEmail,
+        email: registeredEmail,
+        code: cleanedCode,
+      });
       onSignUpSuccess?.(result.user);
     } catch (error) {
       setErrors({ form: error.message || 'Invalid or expired verification code. Please try again.' });
@@ -118,9 +139,15 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
     setIsResending(true);
     setErrors({});
     try {
-      const result = await resendSignupOtp({ email: registeredEmail });
+      const result = await resendSignupOtp({
+        destination: registeredDestination || registeredEmail,
+        email: registeredEmail,
+      });
       setResendCooldown(60);
-      setInfoMessage(result.message || `A new 6-digit code has been sent to ${registeredEmail}.`);
+      setInfoMessage(
+        result.message ||
+        `A new 6-digit code has been sent via ${verificationChannel === 'sms' ? 'SMS' : 'email'} to ${registeredDestination || registeredEmail}.`
+      );
     } catch (error) {
       setErrors({ form: error.message || 'Failed to resend code. Please wait a moment and try again.' });
     } finally {
@@ -164,15 +191,15 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
 
             {/* Logo Badge */}
             <div className="app-logo-badge small-badge" aria-label="Blue Harvest Logo">
-              <svg className="fish-swim-icon" width="40" height="40" viewBox="0 0 48 48" fill="none">
-                <path d="M6 24 C12 11, 24 8, 33 13 L42 7 V37 L33 31 C24 36, 12 33, 6 24 Z" fill="#FFFFFF" />
-                <circle cx="15" cy="21" r="2.8" fill="#2564F4" />
-              </svg>
+              <img src="/blueharvest-logo.png" alt="Blue Harvest Logo" className="app-logo-img" />
             </div>
 
-            <h1 className="app-title small-title">Verify Your Email</h1>
+            <h1 className="app-title small-title">
+              {verificationChannel === 'sms' ? 'Verify Your Mobile Phone' : 'Verify Your Email'}
+            </h1>
             <p className="app-subtitle">
-              Enter the 6-digit code sent to <strong style={{ color: '#0F172A' }}>{registeredEmail}</strong>
+              Enter the 6-digit code sent via {verificationChannel === 'sms' ? 'SMS' : 'email'} to{' '}
+              <strong style={{ color: '#0F172A' }}>{registeredDestination || registeredEmail}</strong>
             </p>
 
             {infoMessage && (
@@ -188,7 +215,11 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
                 fontSize: '13px',
                 marginBottom: '16px'
               }}>
-                <Mail size={18} style={{ flexShrink: 0, color: '#2563EB' }} />
+                {verificationChannel === 'sms' ? (
+                  <Smartphone size={18} style={{ flexShrink: 0, color: '#2563EB' }} />
+                ) : (
+                  <Mail size={18} style={{ flexShrink: 0, color: '#2563EB' }} />
+                )}
                 <span>{infoMessage}</span>
               </div>
             )}
@@ -252,7 +283,9 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
             )}
 
             <div className="bottom-wave-section" style={{ marginTop: '24px', textAlign: 'center' }}>
-              <p className="registration-prompt" style={{ marginBottom: '8px' }}>Didn't receive the email code?</p>
+              <p className="registration-prompt" style={{ marginBottom: '8px' }}>
+                Didn't receive the {verificationChannel === 'sms' ? 'SMS' : 'email'} code?
+              </p>
               {resendCooldown > 0 ? (
                 <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>
                   Resend code in {resendCooldown}s
@@ -284,10 +317,7 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
 
             {/* Logo Badge */}
             <div className="app-logo-badge small-badge" aria-label="Blue Harvest Logo">
-              <svg className="fish-swim-icon" width="40" height="40" viewBox="0 0 48 48" fill="none">
-                <path d="M6 24 C12 11, 24 8, 33 13 L42 7 V37 L33 31 C24 36, 12 33, 6 24 Z" fill="#FFFFFF" />
-                <circle cx="15" cy="21" r="2.8" fill="#2564F4" />
-              </svg>
+              <img src="/blueharvest-logo.png" alt="Blue Harvest Logo" className="app-logo-img" />
             </div>
 
             <h1 className="app-title small-title">Register Hatchery</h1>
@@ -349,9 +379,9 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
                 {errors.email && <span className="field-error-message">{errors.email}</span>}
               </div>
 
-              {/* Optional Phone */}
-              <div className="form-group">
-                <label className="form-label" htmlFor="reg-phone">Phone Number (Optional)</label>
+              {/* Phone Number for SMS verification */}
+              <div className={`form-group ${errors.phone ? 'has-error' : ''}`}>
+                <label className="form-label" htmlFor="reg-phone">Phone Number (SMS Verification)</label>
                 <div className="neumorphic-input-box">
                   <input
                     id="reg-phone"
@@ -361,8 +391,14 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
                     placeholder="+91 98765 43210"
                     value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
+                    required
                   />
                 </div>
+                {errors.phone ? (
+                  <span className="field-error-message">{errors.phone}</span>
+                ) : (
+                  <span className="field-hint-message">Your 10-digit mobile number for Fast2SMS OTP verification.</span>
+                )}
               </div>
 
               {/* Pond/Farm Location */}
