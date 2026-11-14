@@ -59,6 +59,12 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      - key: FAST2SMS_API_KEY
+        sync: false
+      - key: FAST2SMS_ROUTE
+        value: "otp"
+      - key: FAST2SMS_SENDER_ID
+        sync: false
       - key: RETAIN_ALL_UPLOADS
         value: "true"
 
