@@ -13,7 +13,7 @@ services:
       - key: APP_ENV
         value: production
       - key: DATABASE_URL
-        # Set to your permanent CockroachDB Cloud connection string (blueharvest_prod)
+        # Set to your permanent Neon.tech Serverless PostgreSQL connection string (neondb)
         sync: false
       - key: SECRET_KEY
         generateValue: true

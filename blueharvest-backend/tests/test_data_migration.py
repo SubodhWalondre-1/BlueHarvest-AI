@@ -4,7 +4,7 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.models.user import User, UserSettings
 from app.models.count_session import CountSession
-from scripts.migrate_render_to_cockroach import migrate_data, get_table_counts
+from scripts.migrate_render_to_neon import migrate_data, get_table_counts
 
 
 def test_migration_copies_data_with_foreign_keys_intact(tmp_path):

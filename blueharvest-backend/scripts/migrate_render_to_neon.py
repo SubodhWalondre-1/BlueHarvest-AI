@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Zero-Loss Data Migration Tool: Render PostgreSQL to CockroachDB
-Copies all BlueHarvest records safely while keeping the source database 100% read-only.
+Zero-Loss Data Migration Tool: Render PostgreSQL to Neon.tech PostgreSQL
+Copies all BlueHarvest records safely while keeping the Render database 100% read-only and preserved.
 """
 
 import sys
@@ -21,7 +21,7 @@ TABLE_ORDER: List[str] = [
     "contact_change_challenges",
     "password_reset_challenges",
     "email_verification_challenges",
-    "inference_capacities",
+    "inference_capacity",
     "inference_jobs",
     "alembic_version",
 ]
@@ -29,10 +29,6 @@ TABLE_ORDER: List[str] = [
 
 def normalize_db_url(url: str) -> str:
     url = url.strip()
-    if url.startswith("cockroachdb://"):
-        return "postgresql+psycopg2://" + url[len("cockroachdb://"):]
-    if url.startswith("cockroachdb+psycopg2://"):
-        return "postgresql+psycopg2://" + url[len("cockroachdb+psycopg2://"):]
     if url.startswith("postgres://"):
         return "postgresql+psycopg2://" + url[len("postgres://"):]
     if url.startswith("postgresql://"):
@@ -57,7 +53,8 @@ def migrate_data(source_url: str, target_url: str, dry_run: bool = False, batch_
     tgt_clean = normalize_db_url(target_url)
 
     print("=" * 70)
-    print("BLUEHARVEST ZERO-LOSS MIGRATION: RENDER POSTGRES -> COCKROACHDB")
+    print("BLUEHARVEST ZERO-LOSS MIGRATION: RENDER POSTGRES -> NEON.TECH POSTGRES")
+    print("SAFETY GUARANTEE: Render PostgreSQL is treated as strictly read-only.")
     print("=" * 70)
 
     # Establish connections
@@ -79,12 +76,12 @@ def migrate_data(source_url: str, target_url: str, dry_run: bool = False, batch_
         return True
 
     # Step 2: Migrate data table by table
-    print("\n[2/3] Transferring Data to Target (CockroachDB)...")
+    print("\n[2/3] Transferring Data to Target (Neon.tech PostgreSQL)...")
     tgt_metadata = MetaData()
     tgt_metadata.reflect(bind=tgt_engine)
 
     with src_engine.connect() as src_conn, tgt_engine.connect() as tgt_conn:
-        # Enforce read-only isolation on the source
+        # Enforce read-only isolation on the source Render database
         try:
             src_conn.execute(text("SET TRANSACTION READ ONLY"))
         except Exception:
@@ -98,7 +95,7 @@ def migrate_data(source_url: str, target_url: str, dry_run: bool = False, batch_
             print(f"Migrating table '{table_name}' ({count} records)...", end=" ", flush=True)
 
             if table_name not in tgt_metadata.tables:
-                print(f"[SKIP: Table '{table_name}' does not exist on target. Run 'alembic upgrade head' first.]")
+                print(f"[SKIP: Table '{table_name}' does not exist on target. Run 'alembic upgrade head' on Neon first.]")
                 continue
 
             tgt_table: Table = tgt_metadata.tables[table_name]
@@ -142,7 +139,7 @@ def migrate_data(source_url: str, target_url: str, dry_run: bool = False, batch_
     target_counts = get_table_counts(tgt_engine)
 
     print("\n" + "-" * 65)
-    print(f"{'Table Name':<30} | {'Render Source':<15} | {'CockroachDB':<15}")
+    print(f"{'Table Name':<30} | {'Render Source':<15} | {'Neon.tech':<15}")
     print("-" * 65)
 
     all_matched = True
@@ -158,7 +155,7 @@ def migrate_data(source_url: str, target_url: str, dry_run: bool = False, batch_
     print("-" * 65)
 
     if all_matched:
-        print("\nSUCCESS: All data migrated and verified with 0 record loss!")
+        print("\nSUCCESS: All data migrated and verified with 0 record loss! Render remains live as your backup.")
         return True
     else:
         print("\nWARNING: Some table counts did not match. Review the table above.")
@@ -166,9 +163,9 @@ def migrate_data(source_url: str, target_url: str, dry_run: bool = False, batch_
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Zero-loss data migration tool from Render Postgres to CockroachDB")
+    parser = argparse.ArgumentParser(description="Zero-loss data migration tool from Render Postgres to Neon.tech")
     parser.add_argument("--source-url", required=True, help="Render PostgreSQL connection URI")
-    parser.add_argument("--target-url", required=True, help="CockroachDB connection URI")
+    parser.add_argument("--target-url", required=True, help="Neon.tech PostgreSQL connection URI")
     parser.add_argument("--dry-run", action="store_true", help="Inspect source data without writing to target")
     parser.add_argument("--verify-only", action="store_true", help="Compare counts between source and target")
     parser.add_argument("--batch-size", type=int, default=500, help="Batch size for data transfer")
