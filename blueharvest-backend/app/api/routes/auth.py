@@ -405,7 +405,7 @@ async def password_reset_request(body: PasswordResetRequest, request: Request, d
     # Check channel configuration independently of whether an account exists, so a
     # misconfigured deployment does not reveal registered contacts via status codes.
     email_ready = bool(settings.smtp_host and settings.smtp_from_email)
-    sms_ready = bool(settings.twilio_account_sid and settings.twilio_auth_token and settings.twilio_from_number)
+    sms_ready = bool(settings.fast2sms_api_key)
     if not local_otp_exposure and not (email_ready if channel == "email" else sms_ready):
         raise HTTPException(
             status_code=503,

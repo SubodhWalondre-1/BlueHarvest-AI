@@ -60,7 +60,7 @@ def diagnostics(response: Response, db: Session = Depends(get_db)):
         "providers": {
             "google_oauth_configured": bool(settings.google_client_id),
             "email_delivery_configured": bool(settings.smtp_host and settings.smtp_from_email),
-            "sms_delivery_configured": bool(settings.twilio_account_sid and settings.twilio_auth_token and settings.twilio_from_number),
+            "sms_delivery_configured": bool(settings.fast2sms_api_key),
         },
         "demo_mode": {"enabled": settings.demo_mode_enabled, "label": "DEMO DATA — SAMPLE ONLY" if settings.demo_mode_enabled else None},
     }

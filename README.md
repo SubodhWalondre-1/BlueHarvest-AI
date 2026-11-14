@@ -98,7 +98,7 @@ White surfaces, water-blue accents, fish illustrations, and farm landscapes conn
 
 </details>
 
-Google OAuth 2.0, Sentry monitoring, Modal inference, and SMTP/Twilio recovery require external provider configuration. For local testing, mock fallbacks and SQLite defaults are used.
+Google OAuth 2.0, Sentry monitoring, Modal inference, and SMTP/Fast2SMS recovery require external provider configuration. For local testing, mock fallbacks and SQLite defaults are used.
 
 ## Counting workflow
 
@@ -158,7 +158,7 @@ The model runs outside this repository. The backend forwards HTTP requests; it d
 | Authentication | Argon2id password hashes, Google OAuth 2.0, JWT access tokens, opaque refresh tokens with CSRF double-submit |
 | Image handling | Pillow validation, zero-loss durable storage (`RETAIN_ALL_UPLOADS`), Cloudinary signed assets / local fallback |
 | Observability & Security | Sentry application monitoring with strict PII scrubbing, rate limiting, and inference locks |
-| External services | Google Identity Services, Cloudinary storage, Modal serverless inference, SMTP / Twilio recovery |
+| External services | Google Identity Services, Cloudinary storage, Modal serverless inference, SMTP / Fast2SMS recovery |
 | Quality tools | Pytest (253 tests), Node Test Runner (60 tests), and Oxlint |
 | Deployment files | Docker Compose, Render Blueprint (`render.yaml`), Netlify (`netlify.toml`), and Vercel rewrite |
 
@@ -345,7 +345,7 @@ These are application defaults unless stated otherwise. A private `.env` or host
 | `SENTRY_DSN` / `VITE_SENTRY_DSN` | Backend and frontend Sentry DSNs for real-time error tracking and performance monitoring with strict PII scrubbing. |
 | `RETAIN_ALL_UPLOADS` | `false` by default, set `true` in production to enforce zero data loss (disables preview purging and image file deletion). |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM_EMAIL` | Email recovery; port defaults to `587`. Credentials and STARTTLS are configurable. |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | SMS recovery for a registered phone number. |
+| `FAST2SMS_API_KEY`, `FAST2SMS_ROUTE` | SMS OTP recovery for registered Indian mobile numbers via Fast2SMS. |
 | `VITE_API_URL` | Frontend backend address. Set explicitly for deployment. |
 
 See [blueharvest-backend/.env.example](blueharvest-backend/.env.example) and [blueharvest-frontend/.env.example](blueharvest-frontend/.env.example) for example settings. Google sign-in also requires the frontend origin to be authorized in the Google OAuth configuration.
@@ -559,7 +559,7 @@ Access tokens live in memory/sessionStorage. The opaque refresh token uses an Ht
 | :--- | :--- |
 | **Camera capture disabled** | Browser requires a secure origin (`https://` or `http://localhost`). Grant camera device permission in the browser prompt. |
 | **CORS / Session cookie errors**| Confirm `CORS_ORIGINS` exactly matches frontend URL. For cross-site HTTPS, set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none`. |
-| **Password reset OTP fails** | Verify SMTP or Twilio credentials. In local dev mode, set `DEV_EXPOSE_OTP=true` to view codes in test responses. |
+| **Password reset OTP fails** | Verify SMTP or Fast2SMS credentials. In local dev mode, set `DEV_EXPOSE_OTP=true` to view codes in test responses. |
 | **Uploads vanish on restart** | Cloud hosting (Render Free) filesystem is ephemeral. Configure `CLOUDINARY_URL` for durable cloud storage. |
 
 </details>

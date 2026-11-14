@@ -52,9 +52,9 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from_email: str | None = None
     smtp_starttls: bool = True
-    twilio_account_sid: str | None = None
-    twilio_auth_token: str | None = None
-    twilio_from_number: str | None = None
+    fast2sms_api_key: str | None = None
+    fast2sms_route: str = "otp"
+    fast2sms_sender_id: str | None = None
 
     # Modal-hosted BlueHarvest P2PNet inference.
     modal_enabled: bool = True
