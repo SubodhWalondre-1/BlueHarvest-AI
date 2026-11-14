@@ -722,10 +722,7 @@ export default function HomePage({
         <header className="home-header">
           <div className="home-brand">
             <div className="home-logo-circle" aria-label="Blue Harvest Logo">
-              <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
-                <path d="M4.5 14C7 8.5 14 7 19.5 10.5L25 7V21L19.5 17.5C14 21 7 19.5 4.5 14Z" fill="#FFFFFF"/>
-                <circle cx="9" cy="13" r="1.5" fill="#2563EB"/>
-              </svg>
+              <img src="/blueharvest-logo.png" alt="Blue Harvest Logo" className="home-logo-img" />
             </div>
             <span className="home-brand-title">Blue Harvest</span>
           </div>
