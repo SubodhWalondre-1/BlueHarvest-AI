@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import LoginView from './components/LoginView';
 import SignUpView from './components/SignUpView';
 import HomePage from './components/HomePage';
@@ -61,6 +61,13 @@ export default function App() {
   const [route, setRoute] = useState(parseRouteFromLocation);
   // The server, not localStorage, is the source of truth for the active session.
   const [currentUser, setCurrentUser] = useState(null);
+  const currentUserRef = useRef(null);
+
+  const updateUserState = (user) => {
+    currentUserRef.current = user;
+    setCurrentUser(user);
+  };
+
   const [isAuthResolving, setIsAuthResolving] = useState(true);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [notification, setNotification] = useState(null);
@@ -70,7 +77,8 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const currentRoute = parseRouteFromLocation();
-      if (!isAuthResolving && !currentUser && currentRoute.screen === 'home') {
+      const effectiveUser = currentUserRef.current || currentUser;
+      if (!isAuthResolving && !effectiveUser && currentRoute.screen === 'home') {
         window.history.replaceState(null, '', '/login');
         setRoute(parseRouteFromLocation());
         return;
@@ -96,7 +104,7 @@ export default function App() {
     return cleanupListener;
   }, []);
 
-  const navigateTo = (path, replace = false) => {
+  const navigateTo = (path, replace = false, userOverride = undefined) => {
     if (typeof window !== 'undefined') {
       if (replace) {
         window.history.replaceState(null, '', path);
@@ -105,7 +113,8 @@ export default function App() {
       }
     }
     const currentRoute = parseRouteFromLocation();
-    if (!isAuthResolving && !currentUser && currentRoute.screen === 'home') {
+    const effectiveUser = userOverride !== undefined ? userOverride : (currentUserRef.current || currentUser);
+    if (!isAuthResolving && !effectiveUser && currentRoute.screen === 'home') {
       window.history.replaceState(null, '', '/login');
       setRoute(parseRouteFromLocation());
       return;
@@ -124,7 +133,7 @@ export default function App() {
       .then((verifiedUser) => {
         if (cancelled) return;
         if (verifiedUser) {
-          setCurrentUser(verifiedUser);
+          updateUserState(verifiedUser);
           try {
             localStorage.setItem('blueharvest_user', JSON.stringify(verifiedUser));
           } catch {
@@ -135,7 +144,7 @@ export default function App() {
             setRoute(parseRouteFromLocation());
           }
         } else {
-          setCurrentUser(null);
+          updateUserState(null);
           try {
             localStorage.removeItem('blueharvest_user');
           } catch {
@@ -150,7 +159,7 @@ export default function App() {
       })
       .catch(() => {
         if (cancelled) return;
-        setCurrentUser(null);
+        updateUserState(null);
         try {
           localStorage.removeItem('blueharvest_user');
         } catch {
@@ -210,25 +219,25 @@ export default function App() {
   }, [currentUser]);
 
   const handleLoginSuccess = (userData) => {
-    setCurrentUser(userData);
+    updateUserState(userData);
     try {
       localStorage.setItem('blueharvest_user', JSON.stringify(userData));
     } catch {
       // ignore storage error
     }
-    navigateTo('/home');
+    navigateTo('/home', false, userData);
     setNotification(`Welcome back, ${userData.username}!`);
     setTimeout(() => setNotification(null), 3000);
   };
 
   const handleSignUpSuccess = (userData) => {
-    setCurrentUser(userData);
+    updateUserState(userData);
     try {
       localStorage.setItem('blueharvest_user', JSON.stringify(userData));
     } catch {
       // ignore storage error
     }
-    navigateTo('/home');
+    navigateTo('/home', false, userData);
     setNotification(`Account verified and created for ${userData.username}!`);
     setTimeout(() => setNotification(null), 3000);
   };
@@ -239,13 +248,13 @@ export default function App() {
     } catch {
       /* clear local state even if API is unavailable */
     }
-    setCurrentUser(null);
+    updateUserState(null);
     try {
       localStorage.removeItem('blueharvest_user');
     } catch {
       // ignore storage error
     }
-    navigateTo('/login');
+    navigateTo('/login', false, null);
   };
 
   const handleTabChange = (newTab) => {
