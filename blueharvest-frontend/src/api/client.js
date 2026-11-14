@@ -204,10 +204,11 @@ export async function signupUser(payload) {
   return data;
 }
 
-export async function verifySignupOtp({ email, code }) {
+export async function verifySignupOtp({ email, destination, code }) {
+  const target = destination || email;
   const data = await apiRequest('/api/auth/signup/verify', {
     method: 'POST', auth: false,
-    body: jsonBody({ email, code }),
+    body: jsonBody({ email: target, destination: target, code }),
   });
   if (data?.access_token) {
     setAccessToken(data.access_token);
@@ -215,10 +216,11 @@ export async function verifySignupOtp({ email, code }) {
   return data;
 }
 
-export async function resendSignupOtp({ email }) {
+export async function resendSignupOtp({ email, destination }) {
+  const target = destination || email;
   return await apiRequest('/api/auth/signup/resend', {
     method: 'POST', auth: false,
-    body: jsonBody({ email }),
+    body: jsonBody({ email: target, destination: target }),
   });
 }
 
@@ -227,8 +229,28 @@ export async function loginWithGoogleCredential(credential) {
     method: 'POST', auth: false,
     body: jsonBody({ credential }),
   });
-  setAccessToken(data.access_token);
+  if (data?.access_token) {
+    setAccessToken(data.access_token);
+  }
   return data;
+}
+
+export async function verifyGoogleOtp({ challenge_id, code }) {
+  const data = await apiRequest('/api/auth/google/verify-otp', {
+    method: 'POST', auth: false,
+    body: jsonBody({ challenge_id, code }),
+  });
+  if (data?.access_token) {
+    setAccessToken(data.access_token);
+  }
+  return data;
+}
+
+export async function resendGoogleOtp({ challenge_id }) {
+  return await apiRequest('/api/auth/google/resend-otp', {
+    method: 'POST', auth: false,
+    body: jsonBody({ challenge_id }),
+  });
 }
 
 export async function logoutUser() {
