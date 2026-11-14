@@ -1,4 +1,5 @@
-﻿import hashlib
+import re
+import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta
@@ -19,6 +20,8 @@ from app.schemas.auth import (
     PasswordResetConfirm,
     PasswordResetRequest,
     PasswordResetVerify,
+    GoogleResendOtpRequest,
+    GoogleVerifyOtpRequest,
     SignupRequest,
     SignupResendRequest,
     SignupResponse,
@@ -61,7 +64,7 @@ def _lock_recovery_user(db: Session, user_id: str) -> None:
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-def signup(body: SignupRequest, request: Request, response: Response = None, db: Session = Depends(get_db)):
+async def signup(body: SignupRequest, request: Request, response: Response = None, db: Session = Depends(get_db)):
     enforce_rate_limit(db, request, "signup", ip_limit=settings.signup_ip_limit, window_seconds=settings.signup_window_seconds)
     normalized_email = str(body.email).strip().lower()
 
@@ -90,6 +93,14 @@ def signup(body: SignupRequest, request: Request, response: Response = None, db:
         )
         user.email_verified = False
 
+    # Dispatch to SMS if phone is provided, else fallback to Email
+    if user.phone:
+        channel = "sms"
+        destination = user.phone
+    else:
+        channel = "email"
+        destination = normalized_email
+
     now = utcnow_naive()
     # Invalidate previous unconsumed verification challenges
     db.execute(
@@ -102,8 +113,8 @@ def signup(body: SignupRequest, request: Request, response: Response = None, db:
     challenge = EmailVerificationChallenge(
         id=str(uuid4()),
         user_id=user.id,
-        email=normalized_email,
-        code_hash=digest_signup_otp(normalized_email, code),
+        email=destination,
+        code_hash=digest_signup_otp(destination, code),
         expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
         attempt_count=0,
     )
@@ -115,22 +126,28 @@ def signup(body: SignupRequest, request: Request, response: Response = None, db:
         development_code = code
     else:
         try:
-            send_email_otp_sync(normalized_email, code, purpose="email verification")
+            if channel == "sms":
+                await send_sms_otp(user.phone, code, purpose="registration verification")
+            else:
+                await send_email_otp(normalized_email, code, purpose="email verification")
         except DeliveryNotConfigured as exc:
             if settings.app_env.lower() in {"development", "dev", "test"}:
                 development_code = code
             else:
                 db.rollback()
-                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+                raise HTTPException(status_code=503, detail={"code": f"{channel}_delivery_not_configured", "message": str(exc)})
         except Exception:
             db.rollback()
-            raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification email delivery failed. Please check your email configuration."})
+            raise HTTPException(status_code=502, detail={"code": f"{channel}_delivery_failed", "message": f"Verification {channel} delivery failed. Please check configuration."})
 
     result = {
         "verification_required": True,
+        "channel": channel,
+        "destination": destination,
         "email": normalized_email,
+        "phone": user.phone,
         "challenge_id": challenge.id,
-        "message": f"Verification code sent to {normalized_email}. Please enter the 6-digit code to complete registration.",
+        "message": f"Verification code sent to {destination}. Please enter the 6-digit code to complete registration.",
     }
     if development_code is not None:
         result["otp"] = development_code
@@ -139,21 +156,33 @@ def signup(body: SignupRequest, request: Request, response: Response = None, db:
 
 @router.post("/signup/verify")
 def verify_signup(body: SignupVerifyRequest, request: Request, response: Response, db: Session = Depends(get_db)):
-    normalized_email = body.email.strip().lower()
+    target = (body.destination or body.email or "").strip()
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "missing_destination", "message": "Destination or email is required."},
+        )
+
     enforce_rate_limit(
         db,
         request,
         "signup_verify",
         ip_limit=settings.otp_ip_limit,
         window_seconds=settings.otp_window_seconds,
-        account=f"signup_verify:{normalized_email}",
+        account=f"signup_verify:{target.lower()}",
         account_limit=settings.otp_account_limit,
     )
-    user = db.scalar(select(User).where(User.email == normalized_email))
+
+    if "@" in target:
+        user = db.scalar(select(User).where(User.email == target.lower()))
+    else:
+        clean = re.sub(r"[\s().-]", "", target)
+        user = db.scalar(select(User).where(or_(User.phone == target, User.phone == clean)))
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "user_not_found", "message": "No account found with this email."},
+            detail={"code": "user_not_found", "message": "No account found matching this contact."},
         )
 
     now = utcnow_naive()
@@ -176,7 +205,8 @@ def verify_signup(body: SignupVerifyRequest, request: Request, response: Respons
         )
 
     challenge.attempt_count += 1
-    expected_hash = digest_signup_otp(normalized_email, body.code.strip())
+    # Check against challenge.email (which holds the exact destination hashed during challenge creation)
+    expected_hash = digest_signup_otp(challenge.email, body.code.strip())
     if not secrets_compare(challenge.code_hash, expected_hash):
         db.commit()
         remaining = max(0, settings.otp_max_attempts - challenge.attempt_count)
@@ -195,44 +225,60 @@ def verify_signup(body: SignupVerifyRequest, request: Request, response: Respons
 
 
 @router.post("/signup/resend")
-def resend_signup_otp(body: SignupResendRequest, request: Request, db: Session = Depends(get_db)):
-    normalized_email = body.email.strip().lower()
+async def resend_signup_otp(body: SignupResendRequest, request: Request, db: Session = Depends(get_db)):
+    target = (body.destination or body.email or "").strip()
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "missing_destination", "message": "Destination or email is required."},
+        )
+
     enforce_rate_limit(
         db,
         request,
         "signup_resend",
-        ip_limit=settings.otp_ip_limit,
+        ip_limit=settings.otp_request_ip_limit,
         window_seconds=settings.otp_window_seconds,
-        account=f"signup_resend:{normalized_email}",
+        account=f"signup_resend:{target.lower()}",
         account_limit=settings.otp_account_limit,
     )
-    user = db.scalar(select(User).where(User.email == normalized_email))
+
+    if "@" in target:
+        user = db.scalar(select(User).where(User.email == target.lower()))
+    else:
+        clean = re.sub(r"[\s().-]", "", target)
+        user = db.scalar(select(User).where(or_(User.phone == target, User.phone == clean)))
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "user_not_found", "message": "No account found with this email."},
-        )
-    if user.email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"code": "already_verified", "message": "This email is already verified. Please sign in."},
+            detail={"code": "user_not_found", "message": "No account found matching this contact."},
         )
 
     now = utcnow_naive()
-    # Enforce minimum 30s cooldown between resend attempts
-    last_challenge = db.scalar(
+    # Find latest challenge to check cooldown
+    latest_challenge = db.scalar(
         select(EmailVerificationChallenge)
         .where(EmailVerificationChallenge.user_id == user.id)
         .order_by(EmailVerificationChallenge.created_at.desc())
         .limit(1)
     )
-    if last_challenge and (now - last_challenge.created_at).total_seconds() < 30:
-        remaining = 30 - int((now - last_challenge.created_at).total_seconds())
+    if latest_challenge and (now - latest_challenge.created_at).total_seconds() < 30:
+        remaining_cd = max(1, int(30 - (now - latest_challenge.created_at).total_seconds()))
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={"code": "resend_cooldown", "message": f"Please wait {remaining} seconds before requesting a new code."},
+            detail={"code": "resend_cooldown", "message": f"Please wait {remaining_cd} seconds before requesting a new code.", "retry_after": remaining_cd},
+            headers={"Retry-After": str(remaining_cd)},
         )
 
+    if user.phone:
+        channel = "sms"
+        destination = user.phone
+    else:
+        channel = "email"
+        destination = user.email
+
+    # Invalidate previous unconsumed verification challenges
     db.execute(
         update(EmailVerificationChallenge)
         .where(EmailVerificationChallenge.user_id == user.id, EmailVerificationChallenge.consumed_at.is_(None))
@@ -243,8 +289,8 @@ def resend_signup_otp(body: SignupResendRequest, request: Request, db: Session =
     challenge = EmailVerificationChallenge(
         id=str(uuid4()),
         user_id=user.id,
-        email=normalized_email,
-        code_hash=digest_signup_otp(normalized_email, code),
+        email=destination,
+        code_hash=digest_signup_otp(destination, code),
         expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
         attempt_count=0,
     )
@@ -256,26 +302,29 @@ def resend_signup_otp(body: SignupResendRequest, request: Request, db: Session =
         development_code = code
     else:
         try:
-            send_email_otp_sync(normalized_email, code, purpose="email verification")
+            if channel == "sms":
+                await send_sms_otp(user.phone, code, purpose="registration verification")
+            else:
+                await send_email_otp(user.email, code, purpose="email verification")
         except DeliveryNotConfigured as exc:
             if settings.app_env.lower() in {"development", "dev", "test"}:
                 development_code = code
             else:
                 db.rollback()
-                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+                raise HTTPException(status_code=503, detail={"code": f"{channel}_delivery_not_configured", "message": str(exc)})
         except Exception:
             db.rollback()
-            raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification code delivery failed. Check email provider configuration and try again."})
+            raise HTTPException(status_code=502, detail={"code": f"{channel}_delivery_failed", "message": f"Verification {channel} delivery failed."})
 
-    result = {
-        "verification_required": True,
-        "email": normalized_email,
-        "challenge_id": challenge.id,
-        "message": f"New verification code sent to {normalized_email}.",
+    res = {
+        "ok": True,
+        "channel": channel,
+        "destination": destination,
+        "message": f"A new verification code has been sent to {destination}.",
     }
     if development_code is not None:
-        result["otp"] = development_code
-    return result
+        res["otp"] = development_code
+    return res
 
 
 @router.post("/login")
@@ -304,7 +353,7 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
 
 
 @router.post("/google")
-def google_login(body: GoogleLoginRequest, response: Response, db: Session = Depends(get_db)):
+async def google_login(body: GoogleLoginRequest, response: Response, db: Session = Depends(get_db)):
     try:
         claims = verify_google_credential(body.credential)
     except GoogleCredentialError as exc:
@@ -324,7 +373,6 @@ def google_login(body: GoogleLoginRequest, response: Response, db: Session = Dep
         if user:
             # Link only when Google proves control of this verified email address.
             user.google_sub = str(subject)
-            user.email_verified = True
             db.commit()
             db.refresh(user)
         else:
@@ -343,14 +391,156 @@ def google_login(body: GoogleLoginRequest, response: Response, db: Session = Dep
                 google_sub=str(subject),
                 pond_location="Unassigned Pond",
                 display_role="Aquafarm Operator",
-                email_verified=True,
+                email_verified=False,
             )
             user.settings = UserSettings(user_id=user.id)
             db.add(user)
             db.commit()
             db.refresh(user)
 
+    now = utcnow_naive()
+    # Invalidate previous unconsumed verification challenges for this user
+    db.execute(
+        update(EmailVerificationChallenge)
+        .where(EmailVerificationChallenge.user_id == user.id, EmailVerificationChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+    )
+
+    code = generate_otp()
+    challenge = EmailVerificationChallenge(
+        id=str(uuid4()),
+        user_id=user.id,
+        email=email,
+        code_hash=digest_signup_otp(email, code),
+        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        attempt_count=0,
+    )
+    db.add(challenge)
+    db.commit()
+
+    development_code = None
+    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+        development_code = code
+    else:
+        try:
+            await send_email_otp(email, code, purpose="Google sign-in verification")
+        except DeliveryNotConfigured as exc:
+            if settings.app_env.lower() in {"development", "dev", "test"}:
+                development_code = code
+            else:
+                db.rollback()
+                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification email delivery failed. Please check your email configuration."})
+
+    result = {
+        "verification_required": True,
+        "channel": "email",
+        "email": email,
+        "challenge_id": challenge.id,
+        "message": f"Verification code sent to {email}. Please enter the 6-digit code to complete sign-in.",
+    }
+    if development_code is not None:
+        result["otp"] = development_code
+    return result
+
+
+@router.post("/google/verify-otp")
+def verify_google_otp(body: GoogleVerifyOtpRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    challenge = db.scalar(
+        select(EmailVerificationChallenge)
+        .where(
+            EmailVerificationChallenge.id == body.challenge_id,
+            EmailVerificationChallenge.consumed_at.is_(None),
+        )
+    )
+    now = utcnow_naive()
+    if not challenge or challenge.expires_at <= now or challenge.attempt_count >= settings.otp_max_attempts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "verification_code_invalid", "message": "Verification challenge is invalid or has expired."},
+        )
+
+    user = db.scalar(select(User).where(User.id == challenge.user_id))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "user_not_found", "message": "User account not found."})
+
+    challenge.attempt_count += 1
+    expected_hash = digest_signup_otp(challenge.email, body.code.strip())
+    if not secrets_compare(challenge.code_hash, expected_hash):
+        db.commit()
+        remaining = max(0, settings.otp_max_attempts - challenge.attempt_count)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "verification_code_invalid", "message": f"The verification code is invalid. {remaining} attempt(s) remaining."},
+        )
+
+    challenge.verified_at = now
+    challenge.consumed_at = now
+    user.email_verified = True
+    db.commit()
+    db.refresh(user)
+
     return issue_session(db, user, response)
+
+
+@router.post("/google/resend-otp")
+async def resend_google_otp(body: GoogleResendOtpRequest, request: Request, db: Session = Depends(get_db)):
+    challenge = db.scalar(select(EmailVerificationChallenge).where(EmailVerificationChallenge.id == body.challenge_id))
+    if not challenge:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "challenge_not_found", "message": "Verification challenge not found."})
+
+    user = db.scalar(select(User).where(User.id == challenge.user_id))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "user_not_found", "message": "User account not found."})
+
+    now = utcnow_naive()
+    if (now - challenge.created_at).total_seconds() < 30:
+        remaining_cd = max(1, int(30 - (now - challenge.created_at).total_seconds()))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"code": "resend_cooldown", "message": f"Please wait {remaining_cd} seconds before requesting a new code.", "retry_after": remaining_cd},
+            headers={"Retry-After": str(remaining_cd)},
+        )
+
+    code = generate_otp()
+    new_challenge = EmailVerificationChallenge(
+        id=str(uuid4()),
+        user_id=user.id,
+        email=challenge.email,
+        code_hash=digest_signup_otp(challenge.email, code),
+        expires_at=now + timedelta(minutes=settings.otp_ttl_minutes),
+        attempt_count=0,
+    )
+    db.add(new_challenge)
+    db.commit()
+
+    development_code = None
+    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+        development_code = code
+    else:
+        try:
+            await send_email_otp(challenge.email, code, purpose="Google sign-in verification")
+        except DeliveryNotConfigured as exc:
+            if settings.app_env.lower() in {"development", "dev", "test"}:
+                development_code = code
+            else:
+                db.rollback()
+                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification email delivery failed."})
+
+    res = {
+        "ok": True,
+        "challenge_id": new_challenge.id,
+        "email": challenge.email,
+        "message": f"A new verification code has been sent to {challenge.email}.",
+    }
+    if development_code is not None:
+        res["otp"] = development_code
+    return res
 
 
 @router.get("/me")

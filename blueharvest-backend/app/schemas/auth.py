@@ -27,22 +27,43 @@ class SignupRequest(BaseModel):
 
 
 class SignupVerifyRequest(BaseModel):
-    email: EmailStr
+    email: EmailStr | None = None
+    destination: str | None = None
     code: str = Field(pattern=r"^\d{6}$")
 
     @field_validator("email", mode="before")
     @classmethod
     def normalize_email(cls, value):
-        return value.strip().lower() if isinstance(value, str) else value
+        return value.strip().lower() if isinstance(value, str) and value.strip() else None
+
+    @field_validator("destination", mode="before")
+    @classmethod
+    def strip_destination(cls, value):
+        return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 class SignupResendRequest(BaseModel):
-    email: EmailStr
+    email: EmailStr | None = None
+    destination: str | None = None
 
     @field_validator("email", mode="before")
     @classmethod
     def normalize_email(cls, value):
-        return value.strip().lower() if isinstance(value, str) else value
+        return value.strip().lower() if isinstance(value, str) and value.strip() else None
+
+    @field_validator("destination", mode="before")
+    @classmethod
+    def strip_destination(cls, value):
+        return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+class GoogleVerifyOtpRequest(BaseModel):
+    challenge_id: str = Field(min_length=1)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class GoogleResendOtpRequest(BaseModel):
+    challenge_id: str = Field(min_length=1)
 
 
 class SignupResponse(BaseModel):
