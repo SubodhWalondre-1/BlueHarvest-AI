@@ -154,6 +154,10 @@ class Settings(BaseSettings):
     @property
     def normalized_database_url(self) -> str:
         url = self.database_url.strip()
+        if url.startswith("cockroachdb://"):
+            return "postgresql+psycopg2://" + url[len("cockroachdb://") :]
+        if url.startswith("cockroachdb+psycopg2://"):
+            return "postgresql+psycopg2://" + url[len("cockroachdb+psycopg2://") :]
         if url.startswith("postgres://"):
             return "postgresql+psycopg2://" + url[len("postgres://") :]
         if url.startswith("postgresql://"):
