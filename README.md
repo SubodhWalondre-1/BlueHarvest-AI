@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite-087EA4?style=flat-square&logo=react&logoColor=white" alt="React" /></a>
   <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python-007F8B?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" /></a>
-  <a href="https://www.sqlalchemy.org/"><img src="https://img.shields.io/badge/Storage-PostgreSQL%20%2F%20SQLite-155E9A?style=flat-square&logo=postgresql&logoColor=white" alt="Database" /></a>
+  <a href="https://neon.tech/"><img src="https://img.shields.io/badge/Database-Neon.tech%20PostgreSQL-00E599?style=flat-square&logo=postgresql&logoColor=white" alt="Neon PostgreSQL" /></a>
   <a href="#model-integration"><img src="https://img.shields.io/badge/AI%20Inference-Modal%20P2PNet-0369A1?style=flat-square" alt="Inference" /></a>
   <a href="https://sentry.io/"><img src="https://img.shields.io/badge/Telemetry-Sentry-362D59?style=flat-square&logo=sentry&logoColor=white" alt="Sentry" /></a>
   <a href="#development-checks"><img src="https://img.shields.io/badge/Tests-253%20Backend%20%7C%2060%20Frontend-10B981?style=flat-square" alt="Tests" /></a>
@@ -37,6 +37,7 @@
 | :--- | :---: | :--- | :--- |
 | **Frontend UI** | 🟢 `Active` | React 19 + Vite 6 + Lucide | 60 unit tests passing, zero-lint warnings, dark/light/system theme |
 | **Backend API** | 🟢 `Active` | FastAPI + SQLAlchemy 2.0 | 253 backend tests passing, Argon2id & Google OAuth 2.0 auth |
+| **Database** | 🟢 `Permanent` | Neon.tech Serverless Postgres | Native PostgreSQL 16, 100% permanent data retention, zero-loss replication |
 | **AI Vision Cluster** | ⚡ `Serverless` | Modal P2PNet Engine | High-density spawn/fry point detection & spatial heatmaps |
 | **Data Retention** | 🔒 `Zero-Loss` | `RETAIN_ALL_UPLOADS=true` | Permanent raw audit vault (Cloudinary / Local); zero preview pruning |
 | **Auth & Security** | 🛡️ `Protected` | Double-Submit CSRF + JWT | Opaque rotating refresh tokens, rate limiting, and inference locks |
@@ -144,17 +145,18 @@ flowchart TD
     Model -->|"Count, density & heatmap"| API
     API -->|"Zero-loss permanent archive"| Uploads[("Durable Storage (Local / Cloudinary)")]
     Web -->|"Ledger records & analytics"| API
-    API -->|"Accounts, sessions & logs"| DB[("PostgreSQL / SQLite")]
+    API -->|"Accounts, sessions & logs"| DB[("Neon.tech PostgreSQL / SQLite")]
     API -.->|"Sanitized security events (PII scrubbed)"| Sentry["Sentry Error & Performance"]
     Web -.->|"Browser crashes & tracing"| Sentry
 ```
 
-The model runs outside this repository. The backend forwards HTTP requests; it does not load or train P2PNet locally. SQLite is the local default; PostgreSQL connection URLs are supported by the SQLAlchemy setup.
+The model runs outside this repository. The backend forwards HTTP requests; it does not load or train P2PNet locally. SQLite is the local fallback; **Neon.tech Serverless PostgreSQL** powers persistent production storage with zero-loss data replication.
 
 | Layer | Stack |
 | :--- | :--- |
 | Frontend | React 19, Vite, Lucide React, Modular Tabs (`DashboardTab`, `LedgerTab`, `InsightsTab`, `ProfileTab`), Sentry React |
 | Backend | FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, Sentry SDK |
+| Database | Neon.tech Serverless PostgreSQL (Production) / SQLite (Local Fallback) |
 | Authentication | Argon2id password hashes, Google OAuth 2.0, JWT access tokens, opaque refresh tokens with CSRF double-submit |
 | Image handling | Pillow validation, zero-loss durable storage (`RETAIN_ALL_UPLOADS`), Cloudinary signed assets / local fallback |
 | Observability & Security | Sentry application monitoring with strict PII scrubbing, rate limiting, and inference locks |
@@ -328,7 +330,7 @@ These are application defaults unless stated otherwise. A private `.env` or host
 | :--- | :--- |
 | `APP_ENV` | `development`; use `production` for deployment. |
 | `SECRET_KEY` | Replace the development fallback with a unique random secret. Production rejects short or recognized placeholder values. |
-| `DATABASE_URL` | `sqlite:///./data/blueharvest.db`; PostgreSQL URLs are also supported. |
+| `DATABASE_URL` | `sqlite:///./data/blueharvest.db` (local fallback) or Neon.tech Serverless PostgreSQL (`postgresql://...neon.tech/neondb?sslmode=require`). |
 | `UPLOAD_DIR` | `./data/uploads`; relative paths resolve from the backend working directory. |
 | `UPLOAD_STORAGE_PERSISTENT` | `false`; set `true` only for a production directory mounted on persistent storage. |
 | `CLOUDINARY_URL` / `CLOUDINARY_*` | Private durable image storage; required on Render Free. See the storage upgrade guide. |
@@ -492,14 +494,14 @@ docker compose up --build -d
 
 Set a generated `SECRET_KEY` in `blueharvest-backend/.env`, configure the frontend origin, and disable demo mode first. Compose uses production mode and disables development OTP exposure. Run the frontend separately. Keep SQLite deployments to a single API instance.
 
-### Render backend
+### Render backend & Neon.tech Database
 
-[render.yaml](render.yaml) defines a Python web service and linked PostgreSQL database. Import it as a Render Blueprint, then configure private Modal credentials, exact model field mappings, and the frontend origin. Startup runs Alembic and binds Uvicorn to `$PORT`.
+[render.yaml](render.yaml) defines a Python web service connected to a permanent **Neon.tech Serverless PostgreSQL** database. Startup automatically executes Alembic migrations (`alembic upgrade head`) and binds Uvicorn to `$PORT`.
 
-The Blueprint uses free plans and `/tmp/uploads`. Configure private Cloudinary storage before enabling uploads; production does not fall back to this ephemeral directory. See the [storage upgrade guide](docs/private-storage-and-pipeline-fixes.md). According to [Render documentation](https://render.com/docs/free), checked on **22 October 2026**:
-
-- Free web-service files are ephemeral: uploads do not survive restarts or redeploys. PostgreSQL records do not make image files persistent.
-- Free PostgreSQL databases expire after 30 days. This configuration suits temporary demos rather than durable hatchery records.
+- **Database:** **Neon.tech Serverless PostgreSQL** (`neondb`) provides permanent zero-cost data retention (eliminating Render Free PostgreSQL's 30-day expiration timer), automatic scale-to-zero compute when idle, and connection pooling with `sslmode=require`. Zero records are lost during restarts.
+- **Keep-Alive Automation:** An automated 10-minute GitHub Actions keepalive ping ([.github/workflows/keep_alive.yml](.github/workflows/keep_alive.yml)) sends lightweight diagnostic requests to ensure the Render backend instance remains awake 24/7 with zero cold-start delay.
+- **Image Storage:** Private Cloudinary storage (`type="authenticated"`) ensures durable uploads without depending on Render's ephemeral `/tmp` filesystem. See the [storage upgrade guide](docs/private-storage-and-pipeline-fixes.md).
+- **Migration Guide:** Detailed step-by-step procedures for zero-loss data replication and Neon configuration are available in the [Neon Migration Guide](docs/NEON_DATABASE_MIGRATION_GUIDE.md).
 - Free web services block common SMTP ports, including 465 and 587. The current email-recovery adapter needs compatible hosting or a different delivery integration.
 
 ### Static frontend
