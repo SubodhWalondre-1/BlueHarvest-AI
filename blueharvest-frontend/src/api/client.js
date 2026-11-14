@@ -95,7 +95,21 @@ async function parseError(response, fallback) {
     const body = await response.json();
     const detail = body?.detail;
     if (Array.isArray(detail)) {
-      message = detail.map((item) => item.msg || 'Please check the values you entered.').join(' ');
+      message = detail.map((item) => {
+        let msg = item?.msg || 'Please check the values you entered.';
+        msg = msg.replace(/^Value error,\s*/i, '');
+        if (msg.includes('pattern') || item?.type === 'string_pattern_mismatch') {
+          const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : '';
+          if (field === 'username' || msg.includes('^[A-Za-z0-9_.-]+$')) {
+            return 'Username can only contain letters, numbers, underscores, hyphens, and periods (no spaces).';
+          }
+          if (field === 'code' || msg.includes('^\\d{6}$')) {
+            return 'Verification code must be exactly 6 digits.';
+          }
+          return `Please enter a valid format for ${field || 'this field'}.`;
+        }
+        return msg;
+      }).join(' ');
       code = 'validation_error';
     } else if (detail && typeof detail === 'object') {
       message = detail.message || JSON.stringify(detail);

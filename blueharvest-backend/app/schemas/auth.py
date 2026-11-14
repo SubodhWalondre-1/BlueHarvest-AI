@@ -4,7 +4,7 @@ from app.schemas.user import normalize_phone
 
 class SignupRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
-    username: str = Field(min_length=3, max_length=50, pattern=r"^[A-Za-z0-9_.-]+$")
+    username: str = Field(min_length=3, max_length=50)
     email: EmailStr
     phone: str | None = Field(default=None, max_length=24)
     pond_location: str = Field(min_length=1, max_length=200)
@@ -16,6 +16,14 @@ class SignupRequest(BaseModel):
     @classmethod
     def strip_text(cls, value):
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("username")
+    @classmethod
+    def validate_username_format(cls, value: str) -> str:
+        import re
+        if not re.fullmatch(r"^[A-Za-z0-9_.-]+$", value):
+            raise ValueError("Username can only contain letters, numbers, underscores, hyphens, and periods (no spaces).")
+        return value
 
 
 class SignupVerifyRequest(BaseModel):

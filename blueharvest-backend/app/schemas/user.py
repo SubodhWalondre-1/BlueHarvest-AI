@@ -19,7 +19,7 @@ def normalize_phone(value: str | None) -> str | None:
 
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    username: str | None = Field(default=None, min_length=3, max_length=50, pattern=r"^[A-Za-z0-9_.-]+$")
+    username: str | None = Field(default=None, min_length=3, max_length=50)
     display_role: str | None = Field(default=None, min_length=2, max_length=80)
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
     email: EmailStr | None = None
@@ -34,6 +34,16 @@ class UserUpdate(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
     _phone = field_validator("phone", mode="before")(normalize_phone)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username_format(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        import re
+        if not re.fullmatch(r"^[A-Za-z0-9_.-]+$", value):
+            raise ValueError("Username can only contain letters, numbers, underscores, hyphens, and periods (no spaces).")
+        return value
 
 
 class ContactChangeRequest(BaseModel):

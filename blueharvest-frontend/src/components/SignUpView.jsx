@@ -46,7 +46,16 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
     const newErrors = {};
 
     if (!formData.fullName.trim()) newErrors.fullName = 'Full Name is required';
-    if (!formData.username.trim()) newErrors.username = 'Username is required';
+    const trimmedUsername = formData.username.trim();
+    if (!trimmedUsername) {
+      newErrors.username = 'Username is required';
+    } else if (trimmedUsername.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    } else if (trimmedUsername.length > 50) {
+      newErrors.username = 'Username cannot exceed 50 characters';
+    } else if (!/^[A-Za-z0-9_.-]+$/.test(trimmedUsername)) {
+      newErrors.username = 'Username can only contain letters, numbers, underscores, hyphens, and periods (no spaces)';
+    }
     if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       newErrors.email = 'A valid email address is required';
     }
@@ -73,7 +82,12 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
         onSignUpSuccess?.(result.user);
       }
     } catch (error) {
-      setErrors({ form: error.message || 'Account creation failed. Please try again.' });
+      const msg = error.message || 'Account creation failed. Please try again.';
+      if (msg.toLowerCase().includes('username')) {
+        setErrors({ username: msg, form: msg });
+      } else {
+        setErrors({ form: msg });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -310,7 +324,11 @@ export default function SignUpView({ onSignUpSuccess, onSwitchToLogin }) {
                     onChange={(e) => handleChange('username', e.target.value)}
                   />
                 </div>
-                {errors.username && <span className="field-error-message">{errors.username}</span>}
+                {errors.username ? (
+                  <span className="field-error-message">{errors.username}</span>
+                ) : (
+                  <span className="field-hint-message">Letters, numbers, underscores, hyphens, and periods only (no spaces).</span>
+                )}
               </div>
 
               {/* Email */}
