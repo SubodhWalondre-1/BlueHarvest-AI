@@ -54,3 +54,4 @@ def test_signup_with_phone_dispatches_sms_otp(client, monkeypatch):
         })
         assert login_resp.status_code == 200
         assert login_resp.json()["access_token"]
+

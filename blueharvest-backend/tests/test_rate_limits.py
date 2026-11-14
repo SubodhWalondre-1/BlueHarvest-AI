@@ -147,13 +147,14 @@ def test_counters_survive_rollback_and_a_separate_database_engine(rate_db):
 
 
 def test_signup_is_limited_before_account_creation(rate_db):
+    import asyncio
     db, _, _ = rate_db
 
     def signup(index):
-        return auth.signup(SignupRequest(
+        return asyncio.run(auth.signup(SignupRequest(
             full_name="New Operator", username=f"new_operator_{index}", email=f"new{index}@example.com",
             pond_location="Test Pond", password=PASSWORD,
-        ), request(), Response(), db)
+        ), request(), Response(), db))
 
     assert signup(1).get("verification_required") or signup(1).get("access_token")
     assert signup(2).get("verification_required") or signup(2).get("access_token")

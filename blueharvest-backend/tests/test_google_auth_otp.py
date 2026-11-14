@@ -55,3 +55,4 @@ def test_google_login_requires_email_otp(client, monkeypatch):
         assert verify_data["access_token"]
         assert verify_data["user"]["email"] == "farmer_subodh@gmail.com"
         assert settings.refresh_cookie_name in good_verify.cookies
+
