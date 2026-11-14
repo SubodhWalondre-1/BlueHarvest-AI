@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
-import { loginUser, loginWithGoogleCredential } from '../api/client';
+import { Eye, EyeOff, Loader2, AlertCircle, Mail, X } from 'lucide-react';
+import { loginUser, loginWithGoogleCredential, verifyGoogleOtp, resendGoogleOtp } from '../api/client';
 
 const DEFAULT_GOOGLE_CLIENT_ID = '537540751411-6b4bomsui4f4co6ki1jq1m1vt4pt41na.apps.googleusercontent.com';
 
@@ -36,6 +36,52 @@ export default function LoginView({
   const [googleLoadFailed, setGoogleLoadFailed] = useState(false);
   const googleBtnContainerRef = useRef(null);
 
+  // Google Email OTP Modal state
+  const [googleModalOpen, setGoogleModalOpen] = useState(false);
+  const [googleChallengeId, setGoogleChallengeId] = useState('');
+  const [googleEmail, setGoogleEmail] = useState('');
+  const [googleOtpCode, setGoogleOtpCode] = useState('');
+  const [isVerifyingGoogleOtp, setIsVerifyingGoogleOtp] = useState(false);
+  const [googleOtpError, setGoogleOtpError] = useState('');
+  const [googleResendCooldown, setGoogleResendCooldown] = useState(0);
+  const [isGoogleResending, setIsGoogleResending] = useState(false);
+  const [googleResendSuccess, setGoogleResendSuccess] = useState('');
+
+  // Countdown timer for Google OTP resend
+  useEffect(() => {
+    if (googleResendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setGoogleResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [googleResendCooldown]);
+
+  const handleGoogleCredentialResponse = async (credentialResponse) => {
+    try {
+      if (!credentialResponse?.credential) throw new Error('Google did not return an identity credential.');
+      setIsLoading(true);
+      const result = await loginWithGoogleCredential(credentialResponse.credential);
+      if (result?.verification_required) {
+        setGoogleChallengeId(result.challenge_id || '');
+        setGoogleEmail(result.email || '');
+        setGoogleModalOpen(true);
+        setGoogleOtpCode('');
+        setGoogleOtpError('');
+        setGoogleResendCooldown(60);
+        setGoogleResendSuccess(result.message || `We sent a 6-digit verification code to ${result.email}.`);
+      } else if (result?.user) {
+        onLoginSuccess?.(result.user);
+      }
+    } catch (error) {
+      const friendlyMessage = error.message?.toLowerCase().includes('dependency') || error.status === 503
+        ? 'Google sign-in is temporarily unavailable. Please sign in with your credentials or try again shortly.'
+        : (error.message || 'Google sign-in could not be completed. Please try again or use your password.');
+      setAuthError(friendlyMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Initialize Google Identity Services and mount the official button in an isolated DOM container
   useEffect(() => {
     let active = true;
@@ -47,21 +93,7 @@ export default function LoginView({
         if (!active || !window.google?.accounts?.id || !googleBtnContainerRef.current) return;
         window.google.accounts.id.initialize({
           client_id: clientId,
-          callback: async (credentialResponse) => {
-            try {
-              if (!credentialResponse?.credential) throw new Error('Google did not return an identity credential.');
-              setIsLoading(true);
-              const result = await loginWithGoogleCredential(credentialResponse.credential);
-              onLoginSuccess?.(result.user);
-            } catch (error) {
-              const friendlyMessage = error.message?.toLowerCase().includes('dependency') || error.status === 503
-                ? 'Google sign-in is temporarily unavailable. Please sign in with your credentials or try again shortly.'
-                : (error.message || 'Google sign-in could not be completed. Please try again or use your password.');
-              setAuthError(friendlyMessage);
-            } finally {
-              setIsLoading(false);
-            }
-          },
+          callback: handleGoogleCredentialResponse,
         });
 
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
@@ -112,6 +144,52 @@ export default function LoginView({
     }
   };
 
+  const handleVerifyGoogleOtp = async (e) => {
+    e.preventDefault();
+    const cleanedCode = googleOtpCode.trim();
+    if (!cleanedCode || cleanedCode.length !== 6 || !/^\d{6}$/.test(cleanedCode)) {
+      setGoogleOtpError('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setIsVerifyingGoogleOtp(true);
+    setGoogleOtpError('');
+    try {
+      const result = await verifyGoogleOtp({
+        challenge_id: googleChallengeId,
+        code: cleanedCode,
+      });
+      setGoogleModalOpen(false);
+      onLoginSuccess?.(result.user);
+    } catch (error) {
+      setGoogleOtpError(error.message || 'Invalid or expired code. Please try again.');
+    } finally {
+      setIsVerifyingGoogleOtp(false);
+    }
+  };
+
+  const handleResendGoogleOtp = async () => {
+    if (googleResendCooldown > 0 || isGoogleResending) return;
+    setIsGoogleResending(true);
+    setGoogleOtpError('');
+    try {
+      const result = await resendGoogleOtp({ challenge_id: googleChallengeId });
+      setGoogleResendCooldown(60);
+      setGoogleResendSuccess(result.message || `A fresh 6-digit code was sent to ${googleEmail}.`);
+    } catch (error) {
+      setGoogleOtpError(error.message || 'Failed to resend code. Please wait a moment.');
+    } finally {
+      setIsGoogleResending(false);
+    }
+  };
+
+  const handleCloseGoogleModal = () => {
+    setGoogleModalOpen(false);
+    setGoogleOtpCode('');
+    setGoogleOtpError('');
+    setGoogleResendSuccess('');
+  };
+
   const handleGoogleLogin = async () => {
     setAuthError('');
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
@@ -128,21 +206,7 @@ export default function LoginView({
       }
       window.google.accounts.id.initialize({
         client_id: clientId,
-        callback: async (credentialResponse) => {
-          try {
-            if (!credentialResponse?.credential) throw new Error('Google did not return an identity credential.');
-            setIsLoading(true);
-            const result = await loginWithGoogleCredential(credentialResponse.credential);
-            onLoginSuccess?.(result.user);
-          } catch (error) {
-            const friendlyMessage = error.message?.toLowerCase().includes('dependency') || error.status === 503
-              ? 'Google sign-in is temporarily unavailable. Please sign in with your credentials or try again shortly.'
-              : (error.message || 'Google sign-in could not be completed. Please try again.');
-            setAuthError(friendlyMessage);
-          } finally {
-            setIsLoading(false);
-          }
-        },
+        callback: handleGoogleCredentialResponse,
       });
       window.google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed()) {
@@ -218,21 +282,7 @@ export default function LoginView({
 
 {/* Blue Harvest Logo Badge */}
         <div className="app-logo-badge" aria-label="Blue Harvest Logo">
-          <svg 
-            className="fish-swim-icon"
-            width="50" 
-            height="50" 
-            viewBox="0 0 48 48" 
-            fill="none"
-          >
-            {/* Streamlined Fish Silhouette */}
-            <path 
-              d="M6 24 C12 11, 24 8, 33 13 L42 7 V37 L33 31 C24 36, 12 33, 6 24 Z" 
-              fill="#FFFFFF"
-            />
-            {/* Fish Eye */}
-            <circle cx="15" cy="21" r="2.8" fill="#2564F4"/>
-          </svg>
+          <img src="/blueharvest-logo.png" alt="Blue Harvest Logo" className="app-logo-img" />
         </div>
 
         {/* Title & Tagline */}
@@ -382,6 +432,143 @@ export default function LoginView({
           </button>
         </div>
       </div>
+
+      {/* Google Email OTP Verification Modal Popup */}
+      {googleModalOpen && (
+        <div className="google-otp-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="google-otp-title">
+          <div className="google-otp-modal-card">
+            <button
+              type="button"
+              className="google-otp-modal-close"
+              onClick={handleCloseGoogleModal}
+              aria-label="Close verification popup"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="app-logo-badge small-badge" aria-label="Blue Harvest Logo">
+              <img src="/blueharvest-logo.png" alt="Blue Harvest Logo" className="app-logo-img" />
+            </div>
+
+            <h2 id="google-otp-title" className="app-title small-title" style={{ marginTop: '12px' }}>
+              Google Sign-In Verification
+            </h2>
+
+            <p className="app-subtitle" style={{ marginBottom: '16px' }}>
+              To verify your identity, we sent a 6-digit verification code to your Google email:
+              <br />
+              <strong style={{ color: '#0F172A', wordBreak: 'break-all' }}>{googleEmail}</strong>
+            </p>
+
+            {googleResendSuccess && (
+              <div className="auth-info-banner" role="status" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                border: '1px solid rgba(37, 99, 235, 0.2)',
+                color: '#1E40AF',
+                fontSize: '13px',
+                marginBottom: '16px',
+                textAlign: 'left',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
+                <Mail size={18} style={{ flexShrink: 0, color: '#2563EB' }} />
+                <span>{googleResendSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyGoogleOtp} noValidate style={{ width: '100%' }}>
+              <div className={`form-group ${googleOtpError ? 'has-error' : ''}`} style={{ marginBottom: '16px' }}>
+                <label className="form-label" htmlFor="google-otp-input">Enter 6-Digit Email Code</label>
+                <div className="neumorphic-input-box">
+                  <input
+                    id="google-otp-input"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    className="neumorphic-input"
+                    placeholder="e.g. 123456"
+                    value={googleOtpCode}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setGoogleOtpCode(val);
+                      if (googleOtpError) setGoogleOtpError('');
+                    }}
+                    style={{
+                      letterSpacing: '6px',
+                      fontSize: '20px',
+                      fontWeight: '600',
+                      textAlign: 'center'
+                    }}
+                    autoFocus
+                    required
+                  />
+                </div>
+                {googleOtpError && <span className="field-error-message">{googleOtpError}</span>}
+              </div>
+
+              <button
+                type="submit"
+                className="action-btn primary-login-btn"
+                disabled={isVerifyingGoogleOtp || googleOtpCode.length !== 6}
+                style={{ width: '100%', marginBottom: '16px' }}
+              >
+                {isVerifyingGoogleOtp ? (
+                  <span className="btn-loading-state">
+                    <Loader2 size={19} className="spin-icon" />
+                    <span>Verifying Code…</span>
+                  </span>
+                ) : (
+                  <span>Verify & Access Home</span>
+                )}
+              </button>
+            </form>
+
+            <div style={{ textAlign: 'center', marginTop: '8px' }}>
+              <p className="registration-prompt" style={{ marginBottom: '6px', fontSize: '13px' }}>
+                Didn't receive the email?
+              </p>
+              {googleResendCooldown > 0 ? (
+                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>
+                  Resend code in {googleResendCooldown}s
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="action-btn signup-switch-btn"
+                  onClick={handleResendGoogleOtp}
+                  disabled={isGoogleResending}
+                  style={{ minHeight: '36px', padding: '6px 14px', fontSize: '13px' }}
+                >
+                  {isGoogleResending ? 'Sending…' : 'Resend Email Code'}
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="action-btn"
+              onClick={handleCloseGoogleModal}
+              style={{
+                marginTop: '16px',
+                background: 'transparent',
+                border: 'none',
+                color: '#64748B',
+                fontSize: '13px',
+                cursor: 'pointer',
+                textDecoration: 'underline'
+              }}
+            >
+              Cancel & Return to Login
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

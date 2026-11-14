@@ -198,22 +198,38 @@ body::-webkit-scrollbar,
 
 
 
-/* Circular Blue Logo Badge with White Fish */
+/* Circular Logo Badge with Vibrant Fish Logo */
 .app-logo-badge {
   align-self: center;
-  width: 88px;
-  height: 88px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
-  background: #2F6BFF;
+  background: #FFFFFF;
   display: grid;
   place-items: center;
-  box-shadow: 0 8px 18px rgba(47, 107, 255, 0.32);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.20), 0 2px 6px rgba(0, 0, 0, 0.04);
   margin-bottom: 16px;
-  transition: transform 0.2s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.app-logo-badge.small-badge {
+  width: 76px;
+  height: 76px;
+  padding: 3px;
 }
 
 .app-logo-badge:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.26);
+}
+
+.app-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .fish-swim-icon {
@@ -954,14 +970,23 @@ body::-webkit-scrollbar,
 }
 
 .home-logo-circle {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: #2563EB;
+  background: #FFFFFF;
   display: grid;
   place-items: center;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.18), 0 1px 3px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
+  overflow: hidden;
+  padding: 2px;
+}
+
+.home-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .home-brand-title {
@@ -5590,3 +5615,79 @@ html, body, .app-viewport-wrapper, .app-mobile-container,
   color: #94A3B8 !important;
 }
 
+
+
+/* ==========================================================================
+   Google Sign-In Email OTP Verification Modal
+   ========================================================================== */
+.google-otp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(11, 42, 122, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.google-otp-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: #FFFFFF;
+  border-radius: 28px;
+  padding: 32px 28px;
+  box-shadow: 0 20px 45px rgba(12, 40, 109, 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.google-otp-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: #F1F5F9;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.google-otp-modal-close:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+[data-theme="dark"] .google-otp-modal-backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .google-otp-modal-card {
+  background: #0F172A !important;
+  border: 1px solid #1E293B !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6) !important;
+  color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .google-otp-modal-close {
+  background: #1E293B;
+  color: #94A3B8;
+}
+
+[data-theme="dark"] .google-otp-modal-close:hover {
+  background: #334155;
+  color: #F8FAFC;
+}
