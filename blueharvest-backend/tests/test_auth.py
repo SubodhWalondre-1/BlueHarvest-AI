@@ -61,7 +61,15 @@ def test_google_login_success_creates_user_and_issues_session(client, monkeypatc
     monkeypatch.setattr(auth_route, "verify_google_credential", mock_verify)
     response = client.post("/api/auth/google", json={"credential": "mock-valid-google-jwt-credential"})
     assert response.status_code == 200, response.text
-    data = response.json()
+    init_data = response.json()
+    assert init_data["verification_required"] is True
+    assert init_data["channel"] == "email"
+    challenge_id = init_data["challenge_id"]
+    otp = init_data["otp"]
+
+    verify_resp = client.post("/api/auth/google/verify-otp", json={"challenge_id": challenge_id, "code": otp})
+    assert verify_resp.status_code == 200, verify_resp.text
+    data = verify_resp.json()
     assert data["access_token"]
     assert data["user"]["email"] == "google_user@example.com"
     assert data["user"]["username"] == "google_user"
