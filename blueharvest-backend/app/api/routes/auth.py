@@ -458,32 +458,55 @@ def verify_google_otp(body: GoogleVerifyOtpRequest, request: Request, response: 
         select(EmailVerificationChallenge)
         .where(
             EmailVerificationChallenge.id == body.challenge_id,
-            EmailVerificationChallenge.consumed_at.is_(None),
         )
     )
     now = utcnow_naive()
-    if not challenge or challenge.expires_at <= now or challenge.attempt_count >= settings.otp_max_attempts:
+    if not challenge:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "verification_code_invalid", "message": "Verification challenge is invalid or has expired."},
         )
 
-    user = db.scalar(select(User).where(User.id == challenge.user_id))
+    target_challenge = challenge
+    latest_active = db.scalar(
+        select(EmailVerificationChallenge)
+        .where(
+            EmailVerificationChallenge.user_id == challenge.user_id,
+            EmailVerificationChallenge.consumed_at.is_(None),
+        )
+        .order_by(EmailVerificationChallenge.created_at.desc())
+        .limit(1)
+    )
+
+    stripped_code = body.code.strip()
+    if latest_active and latest_active.id != challenge.id:
+        if secrets_compare(latest_active.code_hash, digest_signup_otp(latest_active.email, stripped_code)):
+            target_challenge = latest_active
+        elif target_challenge.consumed_at is not None:
+            target_challenge = latest_active
+
+    if target_challenge.consumed_at is not None or target_challenge.expires_at <= now or target_challenge.attempt_count >= settings.otp_max_attempts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "verification_code_invalid", "message": "Verification challenge is invalid or has expired."},
+        )
+
+    user = db.scalar(select(User).where(User.id == target_challenge.user_id))
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "user_not_found", "message": "User account not found."})
 
-    challenge.attempt_count += 1
-    expected_hash = digest_signup_otp(challenge.email, body.code.strip())
-    if not secrets_compare(challenge.code_hash, expected_hash):
+    target_challenge.attempt_count += 1
+    expected_hash = digest_signup_otp(target_challenge.email, stripped_code)
+    if not secrets_compare(target_challenge.code_hash, expected_hash):
         db.commit()
-        remaining = max(0, settings.otp_max_attempts - challenge.attempt_count)
+        remaining = max(0, settings.otp_max_attempts - target_challenge.attempt_count)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "verification_code_invalid", "message": f"The verification code is invalid. {remaining} attempt(s) remaining."},
         )
 
-    challenge.verified_at = now
-    challenge.consumed_at = now
+    target_challenge.verified_at = now
+    target_challenge.consumed_at = now
     user.email_verified = True
     db.commit()
     db.refresh(user)
@@ -510,6 +533,7 @@ async def resend_google_otp(body: GoogleResendOtpRequest, request: Request, db: 
             headers={"Retry-After": str(remaining_cd)},
         )
 
+    challenge.consumed_at = now
     code = generate_otp()
     new_challenge = EmailVerificationChallenge(
         id=str(uuid4()),

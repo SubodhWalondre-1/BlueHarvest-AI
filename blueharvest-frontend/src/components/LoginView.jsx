@@ -174,6 +174,9 @@ export default function LoginView({
     setGoogleOtpError('');
     try {
       const result = await resendGoogleOtp({ challenge_id: googleChallengeId });
+      if (result?.challenge_id) {
+        setGoogleChallengeId(result.challenge_id);
+      }
       setGoogleResendCooldown(60);
       setGoogleResendSuccess(result.message || `A fresh 6-digit code was sent to ${googleEmail}.`);
     } catch (error) {
