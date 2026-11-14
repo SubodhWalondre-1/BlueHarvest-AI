@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LoginView from './components/LoginView';
 import SignUpView from './components/SignUpView';
 import HomePage from './components/HomePage';
