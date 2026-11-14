@@ -1,0 +1,27 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    # Run every 10 minutes to prevent Render free instance from sleeping
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  ping-render:
+    name: Ping Render API Diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send keep-alive ping
+        run: |
+          echo "Sending keep-alive ping to Render backend..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -m 30 "https://blueharvest-api.onrender.com/api/diagnostics")
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response Body: $BODY"
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "Render backend is alive and healthy!"
+          else
+            echo "Warning: Received HTTP status $HTTP_STATUS"
+          fi
