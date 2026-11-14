@@ -122,21 +122,23 @@ async def signup(body: SignupRequest, request: Request, response: Response = Non
     db.commit()
 
     development_code = None
-    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
-        development_code = code
-    else:
-        try:
-            if channel == "sms":
-                await send_sms_otp(user.phone, code, purpose="registration verification")
-            else:
-                await send_email_otp(normalized_email, code, purpose="email verification")
-        except DeliveryNotConfigured as exc:
-            if settings.app_env.lower() in {"development", "dev", "test"}:
-                development_code = code
-            else:
-                db.rollback()
-                raise HTTPException(status_code=503, detail={"code": f"{channel}_delivery_not_configured", "message": str(exc)})
-        except Exception:
+    try:
+        if channel == "sms":
+            await send_sms_otp(user.phone, code, purpose="registration verification")
+        else:
+            await send_email_otp(normalized_email, code, purpose="email verification")
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+    except DeliveryNotConfigured as exc:
+        if settings.app_env.lower() in {"development", "dev", "test"}:
+            development_code = code
+        else:
+            db.rollback()
+            raise HTTPException(status_code=503, detail={"code": f"{channel}_delivery_not_configured", "message": str(exc)})
+    except Exception:
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+        else:
             db.rollback()
             raise HTTPException(status_code=502, detail={"code": f"{channel}_delivery_failed", "message": f"Verification {channel} delivery failed. Please check configuration."})
 
@@ -298,21 +300,23 @@ async def resend_signup_otp(body: SignupResendRequest, request: Request, db: Ses
     db.commit()
 
     development_code = None
-    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
-        development_code = code
-    else:
-        try:
-            if channel == "sms":
-                await send_sms_otp(user.phone, code, purpose="registration verification")
-            else:
-                await send_email_otp(user.email, code, purpose="email verification")
-        except DeliveryNotConfigured as exc:
-            if settings.app_env.lower() in {"development", "dev", "test"}:
-                development_code = code
-            else:
-                db.rollback()
-                raise HTTPException(status_code=503, detail={"code": f"{channel}_delivery_not_configured", "message": str(exc)})
-        except Exception:
+    try:
+        if channel == "sms":
+            await send_sms_otp(user.phone, code, purpose="registration verification")
+        else:
+            await send_email_otp(user.email, code, purpose="email verification")
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+    except DeliveryNotConfigured as exc:
+        if settings.app_env.lower() in {"development", "dev", "test"}:
+            development_code = code
+        else:
+            db.rollback()
+            raise HTTPException(status_code=503, detail={"code": f"{channel}_delivery_not_configured", "message": str(exc)})
+    except Exception:
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+        else:
             db.rollback()
             raise HTTPException(status_code=502, detail={"code": f"{channel}_delivery_failed", "message": f"Verification {channel} delivery failed."})
 
@@ -419,18 +423,20 @@ async def google_login(body: GoogleLoginRequest, response: Response, db: Session
     db.commit()
 
     development_code = None
-    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
-        development_code = code
-    else:
-        try:
-            await send_email_otp(email, code, purpose="Google sign-in verification")
-        except DeliveryNotConfigured as exc:
-            if settings.app_env.lower() in {"development", "dev", "test"}:
-                development_code = code
-            else:
-                db.rollback()
-                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
-        except Exception:
+    try:
+        await send_email_otp(email, code, purpose="Google sign-in verification")
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+    except DeliveryNotConfigured as exc:
+        if settings.app_env.lower() in {"development", "dev", "test"}:
+            development_code = code
+        else:
+            db.rollback()
+            raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+    except Exception:
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+        else:
             db.rollback()
             raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification email delivery failed. Please check your email configuration."})
 
@@ -517,18 +523,20 @@ async def resend_google_otp(body: GoogleResendOtpRequest, request: Request, db: 
     db.commit()
 
     development_code = None
-    if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
-        development_code = code
-    else:
-        try:
-            await send_email_otp(challenge.email, code, purpose="Google sign-in verification")
-        except DeliveryNotConfigured as exc:
-            if settings.app_env.lower() in {"development", "dev", "test"}:
-                development_code = code
-            else:
-                db.rollback()
-                raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
-        except Exception:
+    try:
+        await send_email_otp(challenge.email, code, purpose="Google sign-in verification")
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+    except DeliveryNotConfigured as exc:
+        if settings.app_env.lower() in {"development", "dev", "test"}:
+            development_code = code
+        else:
+            db.rollback()
+            raise HTTPException(status_code=503, detail={"code": "email_delivery_not_configured", "message": str(exc)})
+    except Exception:
+        if settings.app_env.lower() in {"development", "dev", "test"} and settings.dev_expose_otp:
+            development_code = code
+        else:
             db.rollback()
             raise HTTPException(status_code=502, detail={"code": "email_delivery_failed", "message": "Verification email delivery failed."})
 
